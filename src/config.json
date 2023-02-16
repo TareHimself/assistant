@@ -1,0 +1,21 @@
+{
+    "dataUpdateInterval": 10,
+    "queueTimeout": 300000,
+    "queueItemsPerPage": 10,
+    "maxQueueFetchTime": 5000,
+    "defaultPrimaryColor": "#2f3136",
+    "defaultUserColor": "",
+    "defaultPrefix": ".",
+    "defaultLanguage": "en",
+    "defaultNickname": "Umeko",
+    "defaultVolumeMultiplier": 0.05,
+    "maxRawVolume": 150,
+    "version": 4.0,
+    "leftArrowEmoji": "922308918917615676",
+    "rightArrowEmoji": "922308931966091274",
+    "defaultWelcomeMessage": "Welcome to the server {user}",
+    "defaultTwitchMessage": "{username} just went live, check them out :{link} .",
+    "defaultLevelingMessage": "Congrats on reaching level {level} {user} !",
+    "defaultLeaveMessage": "Sad to see you go {username}",
+    "xpUpdateThreshold": 100
+}
