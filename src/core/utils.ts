@@ -1,6 +1,4 @@
 import { createInterface } from 'readline'
-import * as notifier from 'node-notifier'
-import { notify as BaseNotify } from 'node-notifier'
 
 export function pad(number: number, ammount = 5) {
     let start = `${number}`;
@@ -51,9 +49,3 @@ export function input<T = string>(prompt: string, toResultFn: (input: string) =>
     })
 }
 
-export function notify(title: string, message?: string) {
-    BaseNotify({
-        title,
-        message,
-    })
-}

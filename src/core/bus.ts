@@ -1,11 +1,11 @@
-import { SubProcessMaster } from "./subprocess";
+import { Assistant } from './assistant';
 
 export interface bus {
-    SubProcessMaster: SubProcessMaster;
+	assistant: Assistant;
 }
 
 declare global {
-    var bus: bus;
+	var bus: bus;
 }
 
-export { };
+export {};

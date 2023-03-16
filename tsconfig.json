@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "baseUrl": "src", // This must be specified if "paths" is.
+    "baseUrl": "./src", // This must be specified if "paths" is.
     "paths": {
       "@modules/*": [
         "core/modules/*"
@@ -13,8 +13,6 @@
       ]
     },
     "allowSyntheticDefaultImports": true,
-    "allowJs": true,
-    "checkJs": true,
     "esModuleInterop": true,
     "declaration": false,
     "emitDecoratorMetadata": false,
@@ -49,6 +47,7 @@
   ],
   "exclude": [
     "config.json",
-    "./src/old/*"
-  ],
+    "./src/old/*",
+    "./keys.json"
+  ]
 }
