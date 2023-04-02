@@ -54,6 +54,40 @@ def debug_string(data: str):
 
 #     return packet_id, int(part), int(total), packet
 
+def get_end_index(data: bytes):
+    try:
+        return data.index(PACKET_END_DELIM), len(PACKET_END_DELIM)
+    except:
+        return None, None
+
+
+def get_start_index(data: bytes):
+    try:
+        return data.index(PACKET_START_DELIM), len(PACKET_START_DELIM)
+    except:
+        return None, None
+
+
+def process_packet(packet: bytes, pending: bytes, on_complete_packet: Callable[[], bytes]):
+    remaining = pending + packet
+    while len(remaining) > 0:
+        start_index, start_len = get_start_index(remaining)
+        if start_index is not None:
+            end_index, end_len = get_end_index(remaining)
+            if end_index is not None:
+                on_complete_packet(
+                    remaining[start_index + start_len:end_index])
+                remaining = remaining[end_index + end_len:len(remaining)]
+            else:
+                break
+        else:
+            end_index, end_len = get_end_index(remaining)
+            if end_index is not None:
+                raise "Something unholy has occured"
+            else:
+                return remaining
+    return remaining
+
 
 class Bridge:
     def __init__(self) -> None:
@@ -72,39 +106,7 @@ class Bridge:
         while not self.stop:
             # receive a response from the server
             data = self.socket.recv(1024)
-            while len(data) > 0:
-                start_index = -1
-                end_index = -1
-
-                try:
-                    start_index = data.index(PACKET_START_DELIM)
-                except ValueError as e:
-                    pass
-
-                try:
-                    end_index = data.index(PACKET_END_DELIM)
-                except ValueError as e:
-                    pass
-
-                start_offset = start_index + len(PACKET_START_DELIM)
-                end_offset = end_index + len(PACKET_END_DELIM)
-                if len(pendingData) == 0:
-                    if start_index != -1 and end_index != -1:
-                        self.on_packet(data[start_offset:end_index])
-                        data = data[end_offset:len(data) - 1]
-                    elif start_index != -1:
-                        pendingData = pendingData + \
-                            data[start_offset:len(data) - 1]
-                        data = b''
-                else:
-                    if end_index != -1:
-                        pendingData = pendingData + data[0:end_index]
-                        self.on_packet(pendingData)
-                        pendingData = b''
-                        data = data[end_offset:len(data) - 1]
-                    else:
-                        pendingData = pendingData + data
-                        data = b''
+            pendingData = process_packet(data, pendingData, self.on_packet)
 
     def send(self, packet: bytes, op: int = 0):
         self._send(packet, op)
@@ -125,7 +127,7 @@ class Bridge:
 
 
 CHANNELS = 1
-DEFAULT_INPUT_DEVICE = None# 4
+DEFAULT_INPUT_DEVICE = None  # 4
 DEFAULT_SAMPLE_RATE = 16000
 MAIN_STREAM_BLOCK_SIZE = 8000
 FORMAT = pyaudio.paInt16

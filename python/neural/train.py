@@ -12,7 +12,7 @@ from tqdm import tqdm
 PYTORCH_DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
-def train_intents(intents: list, save_path: str, batch_size=64, learning_rate=0.0001, epochs=200):
+def train_intents(intents: list, save_path: str, batch_size=64, learning_rate=0.0003, epochs=50):
     expand_all_examples(intents)
     intents_hash = hash_intents(intents)
     if path.exists(save_path):
@@ -52,7 +52,7 @@ def train_intents(intents: list, save_path: str, batch_size=64, learning_rate=0.
 
     input_size = len(dataset.vocab)
     embed_dim = 300
-    hidden_size = 128
+    hidden_size = 256
     output_size = len(dataset.tags)
     debug_string("device" + PYTORCH_DEVICE.__str__())
     model = IntentsNeuralNet(input_size, embed_dim,
@@ -82,7 +82,7 @@ def train_intents(intents: list, save_path: str, batch_size=64, learning_rate=0.
         accu_val = total_accu / total_count
         loading_bar.update()
         loading_bar.set_description_str(
-            f'epoch {epoch + 1}/{epochs} ::  Accuracy {(accu_val * 100):.4f} :: loss {loss.item():.4f}')
+            f'epoch {epoch + 1}/{epochs} ::  Accuracy {(accu_val * 100):.4f} :: loss {loss.item():.8f}')
 
     data_to_save = {
         "state": model.state_dict(),

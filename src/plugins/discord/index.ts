@@ -1,9 +1,14 @@
 import { AssistantContext, AssistantPlugin } from '@core/assistant';
-import { DiscordMessage, DiscordMessageReply, GatewayIntent } from './types';
-import { Gateway } from './ws';
+import {
+	Client,
+	Events,
+	Partials,
+	GatewayIntentBits,
+	Message,
+} from 'discord.js';
 
 export interface IDiscordMessageInfo {
-	message: DiscordMessage;
+	message: Message;
 }
 
 class DiscordContext extends AssistantContext {
@@ -19,46 +24,90 @@ class DiscordContext extends AssistantContext {
 		return 'discord-io';
 	}
 
-	override async getInput(prompt: number, timeout: number): Promise<void> {}
+	override getInput(prompt: string, timeout?: number): Promise<string> {
+		return new Promise<string>((res) => {
+			const onMessageRecieved = (message: Message) => {
+				this.data.message = message;
+				res(message.content);
+			};
 
-	override async reply(data: string): Promise<void> {
-		this.plugin.discordClient.api.post<any, any, DiscordMessageReply>(
-			`/channels/${this.data.message.channel_id}/messages`,
-			{
-				content: data,
-				message_reference: {
-					message_id: this.data.message.id,
-					channel_id: this.data.message.channel_id,
+			this.plugin.pendingUserInputs[
+				this.data.message.channelId + this.data.message.author.id
+			] = onMessageRecieved;
+
+			this.reply(prompt);
+		});
+	}
+
+	override async reply(data: string): Promise<boolean> {
+		this.data.message.reply({
+			content: data,
+		});
+		return true;
+	}
+
+	override async replyImage(data: Buffer): Promise<boolean> {
+		await this.data.message.reply({
+			files: [
+				{
+					attachment: data,
+					name: 'image.png',
 				},
-			}
-		);
+			],
+		});
+		return true;
 	}
 }
 
 export default class DiscordPlugin extends AssistantPlugin {
-	discordClient: Gateway = new Gateway(process.env.DISCORD_BOT_TOKEN, [
-		GatewayIntent.DIRECT_MESSAGES,
-		GatewayIntent.MESSAGE_CONTENT,
-		GatewayIntent.GUILD_MESSAGES,
-		GatewayIntent.GUILD_VOICE_STATES,
-	]);
+	client = new Client({
+		intents: [
+			GatewayIntentBits.DirectMessages,
+			GatewayIntentBits.MessageContent,
+			GatewayIntentBits.GuildMessages,
+			GatewayIntentBits.GuildVoiceStates,
+		],
+		partials: [Partials.Message, Partials.Channel],
+	});
+
+	pendingUserInputs: { [key: string]: (message: Message) => void } = {};
 
 	constructor() {
 		super();
 	}
 
 	override async onLoad(): Promise<void> {
-		this.discordClient.onDispatchEvent('MESSAGE_CREATE', (message) => {
-			if (message.author.id === this.discordClient.readyData?.user.id) {
+		this.client.on(Events.MessageCreate, (message) => {
+			if (message.author.id === this.client.user?.id) {
 				return;
 			}
+
+			if (this.pendingUserInputs[message.channelId + message.author.id]) {
+				this.pendingUserInputs[message.channelId + message.author.id](message);
+				delete this.pendingUserInputs[message.channelId + message.author.id];
+				return;
+			}
+
 			this.assistant.tryStartSkill(
 				message.content,
 				new DiscordContext(this, {
 					message: message,
 				}),
-				message.guild_id === undefined
+				message.guildId === null
 			);
+		});
+
+		await new Promise<void>((res, rej) => {
+			this.client.once(Events.ClientReady, (c) => {
+				console.log(`Ready! Logged in as ${c.user.tag}`);
+				res();
+			});
+
+			try {
+				this.client.login(process.env.DISCORD_BOT_TOKEN);
+			} catch (error) {
+				rej(error);
+			}
 		});
 	}
 

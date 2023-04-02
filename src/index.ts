@@ -1,27 +1,30 @@
-import './resolver';
-import * as fs from 'fs';
-import path from 'path';
+import './resolver'; // top level import for module resolution help
+import './console';
+/**
+ * Gets a random item from the array
+ */
+Array.prototype.random = function <T>(this: T[]): T {
+	return this[Math.round((this.length - 1) * Math.random())];
+};
+
 process.env = {
 	...process.env,
-	...JSON.parse(
-		fs.readFileSync(path.join(__dirname, '../keys.json'), { encoding: 'ascii' })
-	),
+	...require('../keys.json'),
 };
-import { Assistant, DefaultContext } from '@core/assistant';
-import { ELoadableState } from '@core/base';
-import { PythonProcess } from '@core/subprocess';
+import { Assistant } from '@core/assistant';
+
 global.bus = {
 	assistant: new Assistant(),
 };
 
-//SendNotification({ app: "Alice (Assistant)", image: `D:\\Github\\voice\\assets\\icon.png`, title: "Kirei", content: "Where Is You?" })
+// SendNotification({ app: "Alice (Assistant)", image: `D:\\Github\\voice\\assets\\icon.png`, title: "Kirei", content: "Where Is You?" })
 
 // const tts: PythonProcess = new PythonProcess('tts.py');
 // const stt: PythonProcess = new PythonProcess('stt.py');
 // tts.waitForState(ELoadableState.ACTIVE).then(() => {
-// 	console.log('TTS ACTIVE');
+// 	console.info('TTS ACTIVE');
 // 	stt.waitForState(ELoadableState.ACTIVE).then(() => {
-// 		console.log('STT ACTIVE');
+// 		console.info('STT ACTIVE');
 // 		tts.send(Buffer.from('Speech to text active'), 0);
 // 		stt.on('onPacket', (op, data) => {
 // 			tts.send(data, op);

@@ -18,16 +18,23 @@ export interface IIntent {
 	examples: string[];
 }
 
+export type GoogleSearchResponse<T> = {
+	result: T;
+	error: boolean;
+};
+
 declare global {
 	namespace NodeJS {
 		// Alias for compatibility
 		interface ProcessEnv extends Dict<string> {
-			/**
-			 * Can be used to change the default timezone at runtime
-			 */
 			DISCORD_BOT_TOKEN: string;
 			PYTHON_EXECUTABLE_PATH: string;
 			TELEGRAM_BOT_TOKEN: string;
+			TENOR_KEY: string;
 		}
+	}
+
+	interface Array<T> {
+		random(): T;
 	}
 }

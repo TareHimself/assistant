@@ -1,5 +1,4 @@
-const WordsToNumbers = {
-	zero: 0,
+const WORDS_TO_DIGITS = {
 	one: 1,
 	two: 2,
 	three: 3,
@@ -21,7 +20,7 @@ const WordsToNumbers = {
 	nineteen: 19,
 	twenty: 20,
 	thirty: 30,
-	forty: 40,
+	fourty: 40,
 	fifty: 50,
 	sixty: 60,
 	seventy: 70,
@@ -29,8 +28,15 @@ const WordsToNumbers = {
 	ninety: 90,
 };
 
-const NumbersToWords = {
-	'0': 'zero',
+const WORDS_TO_DIGITS_EXPONENTS = {
+	hundred: 1e2,
+	thousand: 1e3,
+	million: 1e6,
+	billion: 1e9,
+	trillion: 1e12,
+};
+
+const DIGITS_TO_WORDS = {
 	'1': 'one',
 	'2': 'two',
 	'3': 'three',
@@ -52,7 +58,7 @@ const NumbersToWords = {
 	'19': 'nineteen',
 	'20': 'twenty',
 	'30': 'thirty',
-	'40': 'forty',
+	'40': 'fourty',
 	'50': 'fifty',
 	'60': 'sixty',
 	'70': 'seventy',
@@ -60,28 +66,126 @@ const NumbersToWords = {
 	'90': 'ninety',
 };
 
-const WordsToNumbersExponents = {
-	hundred: 10e2,
-	thousand: 10e3,
-	million: 10e6,
-	billion: 10e9,
-	trillion: 10e12,
-	quadrillion: 10e15,
+const DIGITS_TO_WORDS_EXPONENTS = {
+	1e3: 'thousand',
+	1e6: 'million',
+	1e9: 'billion',
+	1e12: 'trillion',
 };
 
-const NumbersToWordsExponents = {
-	0: '',
-	1: 'thousand',
-	2: 'million',
-	3: 'billion',
-	4: 'trillion',
-	5: 'quadrillion',
-};
+const DIGITS_REGEX = /[\d]+/;
 
-export function numbersToWords(num: number): string {
-	return '';
+// const PUNCTUATION_REGEX = /[!._,'@?\/\/s]/;
+
+export function wordsToDigits(words: string) {
+	let pending: number[] = [];
+
+	let finalWord = words.split(' ').reduce((result, current) => {
+		const item = current.toLowerCase();
+
+		if (
+			item.trim() === 'and' ||
+			(item.trim() === ',' && pending !== undefined)
+		) {
+			return result;
+		}
+
+		if (WORDS_TO_DIGITS[item] !== undefined) {
+			if (pending.length === 0) pending = [0];
+
+			pending[0] += WORDS_TO_DIGITS[item];
+
+			return result;
+		} else if (
+			WORDS_TO_DIGITS_EXPONENTS[item] !== undefined &&
+			pending.length > 0
+		) {
+			pending[0] = WORDS_TO_DIGITS_EXPONENTS[item] * pending[0];
+
+			if (
+				WORDS_TO_DIGITS_EXPONENTS[item] !== WORDS_TO_DIGITS_EXPONENTS['hundred']
+			) {
+				pending.unshift(0);
+			}
+
+			return result;
+		} else if (pending.length > 0) {
+			const final = `${result} ${pending.reduce(
+				(a, b) => a + b,
+				0
+			)} ${current}`;
+			pending = [];
+			return final;
+		}
+
+		return `${result} ${current}`;
+	}, '');
+
+	if (pending.length > 0) {
+		finalWord += ` ${pending.reduce((a, b) => a + b, 0)}`;
+	}
+
+	return finalWord.trim();
 }
 
-export function wordsToNumbers(wrds: string): number {
-	return 0;
+export function digitToWord(digit: string | number) {
+	const digitAsString = typeof digit === 'string' ? digit : `${digit}`;
+
+	const indexes: string[] = [];
+
+	for (let i = digitAsString.length; i > 0; i -= 3) {
+		indexes.unshift(digitAsString.slice(Math.max(i - 3, 0), i));
+	}
+
+	let idx = 0;
+
+	return indexes
+		.reduce((final, current) => {
+			const exponent = Math.pow(10, (indexes.length - 1 - idx) * 3);
+			const item =
+				current.length === 3
+					? current
+					: current.length === 1
+					? `xx${current}`
+					: `x${current}`;
+			let end = DIGITS_TO_WORDS_EXPONENTS[exponent] || '';
+			let start = DIGITS_TO_WORDS[item[0]]
+				? `${DIGITS_TO_WORDS[item[0]]} hundred`
+				: '';
+			let middle = '';
+			if (item[1] !== 'x') {
+				if (DIGITS_TO_WORDS[`${item[1]}${item[2]}`]) {
+					middle = DIGITS_TO_WORDS[`${item[1]}${item[2]}`];
+				} else {
+					middle = `${DIGITS_TO_WORDS[`${item[1]}0`]} ${
+						DIGITS_TO_WORDS[`${item[2]}`]
+					}`;
+				}
+			} else {
+				middle = `${DIGITS_TO_WORDS[item[2]]}`;
+			}
+
+			if (middle && start) {
+				middle = `and ${middle}`;
+			}
+
+			const curStatement =
+				[start, middle, end, idx === indexes.length - 2 ? ',' : ''].join(' ') +
+				' ';
+			idx++;
+			return final + curStatement;
+		}, '')
+		.trim();
+}
+
+export function digitsToWords(digits: string) {
+	return digits
+		.split(' ')
+		.map((current) => {
+			if (current.match(DIGITS_REGEX)) {
+				return digitToWord(current);
+			}
+			return current;
+		})
+		.join(' ');
 }

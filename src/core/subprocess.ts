@@ -124,7 +124,7 @@ export class SubProcess extends Loadable {
 
 			this.serverPort = s;
 			this.clientPort = c;
-			console.log(
+			console.info(
 				'Subprocess server on port',
 				this.serverPort,
 				'With client on port',
@@ -158,66 +158,47 @@ export class SubProcess extends Loadable {
 				this.addBoundEvent(this.process, 'exit', onExitCallback);
 			});
 		})();
-		this.once('onPacket', async () => {
-			console.log(
-				'Recieved inital packet from client on port',
-				this.clientPort
-			);
-			await this.load();
-		});
-		this.on('onProcessError', (buff) => {
-			console.log('Process Error', buff.toString());
-		});
-		this.on('onProcessStdout', (buff) => {
-			console.log('Process Debug', buff.toString());
+		this.once('onPacket', () => {
+			if (
+				this.state !== ELoadableState.ACTIVE &&
+				this.state !== ELoadableState.LOADING
+			) {
+				this.load();
+			}
 		});
 	}
 
 	async onClientConnected(socket: net.Socket) {
 		this.connectedClient = socket;
+		let pendingData: Buffer = Buffer.alloc(0);
 		socket.on('data', (data) => {
-			let currentData = data;
+			let currentData = Buffer.concat([pendingData, data]);
+
 			while (currentData.length > 0) {
 				const startIndex = currentData.indexOf(PACKET_START_BUFF);
-				const endIndex = currentData.indexOf(PACKET_END_BUFF);
-				const startOffset = startIndex + PACKET_START_BUFF.length;
-				const endOffset = endIndex + PACKET_END_BUFF.length;
 
-				if (this.pendingBuff.length === 0) {
-					if (startIndex !== -1 && endIndex !== -1) {
-						this._onPacket(currentData.slice(startOffset, endIndex));
-						currentData = currentData.slice(endOffset, currentData.length - 1);
-					} else if (startIndex !== -1) {
-						this.pendingBuff = Buffer.concat([
-							this.pendingBuff,
-							currentData.slice(startOffset, currentData.length - 1),
-						]);
-						currentData = Buffer.alloc(0);
+				if (startIndex >= 0) {
+					const endIndex = currentData.indexOf(PACKET_END_BUFF);
+
+					if (endIndex >= 0) {
+						this._onPacket(
+							currentData.slice(startIndex + PACKET_START_BUFF.length, endIndex)
+						);
+						currentData = currentData.slice(endIndex + PACKET_END_BUFF.length);
+					} else {
+						break;
 					}
 				} else {
-					if (endIndex !== -1) {
-						this.pendingBuff = Buffer.concat([
-							this.pendingBuff,
-							currentData.slice(0, endIndex),
-						]);
-						this._onPacket(this.pendingBuff);
-						this.pendingBuff = Buffer.alloc(0);
-						currentData = currentData.slice(endOffset, currentData.length - 1);
-					} else {
-						this.pendingBuff = Buffer.concat([this.pendingBuff, currentData]);
-						currentData = Buffer.alloc(0);
-					}
+					throw new Error('An abomination has occured');
 				}
 			}
+
+			pendingData = currentData;
 		});
 	}
 
 	_onPacket(packet: Buffer) {
-		this.emit(
-			'onPacket',
-			packet.slice(0, 4).readInt32BE(),
-			packet.slice(4, packet.length)
-		);
+		this.emit('onPacket', packet.slice(0, 4).readInt32BE(), packet.slice(4));
 	}
 
 	async send(data: Buffer, op: number = 0) {
@@ -250,7 +231,7 @@ export class SubProcess extends Loadable {
 }
 
 export class PythonProcess extends SubProcess {
-	static PYTHON_FILE_PATHS = path.join(process.cwd(), 'py');
+	static PYTHON_FILE_PATHS = path.join(process.cwd(), 'python');
 	static PYTHON_INTERPRETER_PATH = process.env.PYTHON_EXECUTABLE_PATH;
 	constructor(file: string, args: string[] = []) {
 		super(
