@@ -66,6 +66,7 @@ export default class DiscordPlugin extends AssistantPlugin {
 			GatewayIntentBits.MessageContent,
 			GatewayIntentBits.GuildMessages,
 			GatewayIntentBits.GuildVoiceStates,
+			GatewayIntentBits.Guilds,
 		],
 		partials: [Partials.Message, Partials.Channel],
 	});
@@ -99,7 +100,6 @@ export default class DiscordPlugin extends AssistantPlugin {
 
 		await new Promise<void>((res, rej) => {
 			this.client.once(Events.ClientReady, (c) => {
-				console.log(`Ready! Logged in as ${c.user.tag}`);
 				res();
 			});
 

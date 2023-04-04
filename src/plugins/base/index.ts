@@ -6,7 +6,7 @@ import {
 } from '@core/assistant';
 import { IIntent } from '@core/types';
 import math = require('mathjs');
-import { delay } from '@core/utils';
+import { delay, pad } from '@core/utils';
 import { digitsToWords, wordsToDigits } from '@core/conversion';
 import { PythonProcess } from '@core/subprocess';
 import { compareTwoStrings } from 'string-similarity';
@@ -125,12 +125,16 @@ class AppOpenCloseSkill extends AssistantSkill<null> {
 type GenerateImageSkillData = {
 	tags: string;
 };
+
 class GenerateImageSkill extends AssistantSkill<GenerateImageSkillData> {
 	override get intents(): IIntent[] {
 		return [
 			{
 				tag: 'skill_generate_anime',
 				examples: [
+					'generate beans',
+					'generate school',
+					'generate house',
 					'generate [white hair | blue eyes | white dress | pink lips ], [glasses | horns | purple eyes], [skirt | ember skin]',
 					'generate red trees, 1girl, two tables',
 					'generate masterpiece, best quality, upper body, 1girl, looking at viewer, red hair, medium hair, purple eyes, demon horns, black coat, indoors',
@@ -151,7 +155,6 @@ class GenerateImageSkill extends AssistantSkill<GenerateImageSkillData> {
 					'generate cowboy, hat, boots, spurs, lasso',
 					'generate spy, sunglasses, briefcase, stealth, espionage',
 					'generate musician, guitar, microphone, stage, performance',
-					'generate zombie, torn clothes, brains, undead, apocalypse',
 					'generate firefighter, axe, helmet, hose, bravery',
 					'generate samurai, armor, sword, honor, bushido',
 					'generate ghost, chains, white sheet, haunting, supernatural',
@@ -163,8 +166,6 @@ class GenerateImageSkill extends AssistantSkill<GenerateImageSkillData> {
 					'generate futuristic space station, android, red eyes, silver hair, holding a laser sword, black bodysuit, woman',
 					'generate concert stage, male, rockstar, leather pants, ripped shirt, electric guitar, long hair, tattoos',
 					'generate snowy forest, girl, white hair, wolf ears, blue eyes, holding a staff, fur cloak',
-					'generate magic academy, woman, fairy godmother, wand, purple dress, white hair, pointy ears',
-					'generate city rooftop, man, superhero, cape, mask, black bodysuit, holding a grappling hook',
 					'generate abandoned warehouse, woman, assassin, black catsuit, red eyes, short black hair, holding a knife',
 					'generate moonlit garden, vampire, woman, red dress, long black hair, holding a glass of red wine',
 					'generate underwater ruins, mermaid, pink hair, trident, scales, green eyes, woman',
@@ -348,7 +349,7 @@ class TimeSkill extends AssistantSkill<null> {
 				'@ans',
 				`${
 					date.getHours() !== 12 ? date.getHours() % 12 : date.getHours()
-				}:${date.getMinutes()} ${date.getHours() < 12 ? 'am' : 'pm'}`
+				}:${pad(date.getMinutes())} ${date.getHours() < 12 ? 'am' : 'pm'}`
 			)
 		);
 	}
@@ -413,61 +414,11 @@ class SpeakSkill extends AssistantSkill<ISpeakSkillData> {
 	}
 }
 
-/**
- * The base context, uses speech to text and text to speech for commmunication.
- */
-export class BaseContext extends AssistantContext {
-	plugin: BasePlugin;
-
-	constructor(plugin: BasePlugin) {
-		super();
-		this.plugin = plugin;
-	}
-
-	override get id() {
-		return 'base-io';
-	}
-
-	override async onLoad() {}
-
-	override async reply(data: string): Promise<boolean> {
-		this.plugin.tts.send(Buffer.from(data + data.endsWith('.') ? '' : '.'));
-		return true;
-	}
-
-	override getInput(
-		prompt: string,
-		timeout?: number | undefined
-	): Promise<string | undefined> {
-		return new Promise((res) => {
-			this.reply(prompt);
-			this.plugin.pendingCallback = (data: string) => {
-				res(data);
-			};
-		});
-	}
-}
-
 export default class BasePlugin extends AssistantPlugin {
-	tts = new PythonProcess('tts.py');
-	stt = new PythonProcess('stt.py');
-	pendingCallback: ((data: string) => void) | null = null;
 	override get id(): string {
 		return 'base-plugin';
 	}
 
-	override async load(): Promise<void> {
-		await this.stt.waitForState(ELoadableState.ACTIVE);
-		await this.tts.waitForState(ELoadableState.ACTIVE);
-		this.stt.on('onPacket', (_, pack) => {
-			if (this.pendingCallback) {
-				this.pendingCallback(pack.toString());
-				this.pendingCallback = null;
-				return;
-			}
-			bus.assistant.tryStartSkill(pack.toString(), new BaseContext(this));
-		});
-	}
 	override async getSkills(): Promise<AssistantSkill[]> {
 		return [
 			new ArithmeticSkill(),

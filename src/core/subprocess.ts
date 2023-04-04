@@ -124,12 +124,7 @@ export class SubProcess extends Loadable {
 
 			this.serverPort = s;
 			this.clientPort = c;
-			console.info(
-				'Subprocess server on port',
-				this.serverPort,
-				'With client on port',
-				this.clientPort
-			);
+			console.info(`Started process ${this.filePath}`);
 			this.tcpServer.listen(this.serverPort, '127.0.0.1', () => {
 				this.process = spawn(executable, [
 					this.filePath,

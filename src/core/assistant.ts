@@ -94,7 +94,7 @@ export class Assistant extends Loadable {
 	activeSkills: Map<string, SkillInstance> = new Map();
 
 	static WAKE_WORD = 'alice';
-	static SKILL_START_CONFIDENCE = 0.8;
+	static SKILL_START_CONFIDENCE = 0.5;
 	constructor() {
 		super();
 		console.info('Loading assistant');
@@ -123,9 +123,6 @@ export class Assistant extends Loadable {
 			)
 		);
 		console.info('Plugins loaded');
-		console.info('Waiting for tts process');
-
-		console.info('Waiting for stt process');
 
 		console.info('Waiting for nlu process');
 		await this.nluProcess.waitForState(ELoadableState.ACTIVE);
@@ -217,8 +214,10 @@ export class Assistant extends Loadable {
 		context: AssistantContext,
 		bIsVerifiedPrompt: boolean = false
 	) {
+		if (this.state !== ELoadableState.ACTIVE) return [];
+
 		prompt = prompt.trim();
-		console.info('PROMPT', prompt);
+
 		if (!bIsVerifiedPrompt) {
 			if (
 				prompt.toLowerCase() === Assistant.WAKE_WORD &&
@@ -234,11 +233,6 @@ export class Assistant extends Loadable {
 				this.bIsExpectingCommand = false;
 			}
 
-			const similarity = compareTwoStrings(
-				Assistant.WAKE_WORD,
-				prompt.toLowerCase().split(' ')[0]
-			);
-
 			//console.info(prompt, similarity);
 			if (!prompt.toLowerCase().startsWith(Assistant.WAKE_WORD)) return [];
 
@@ -253,6 +247,7 @@ export class Assistant extends Loadable {
 		const [confidence, intent] = await this.getIntent(prompt);
 		if (confidence > Assistant.SKILL_START_CONFIDENCE) {
 			const skills = this.currentSkills.get(intent);
+
 			if (!skills) {
 				context.reply(
 					'I do not have any skills that can handle that right now.'

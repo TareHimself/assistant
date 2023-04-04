@@ -19,6 +19,7 @@
   "dependencies": {
     "@discordjs/opus": "^0.9.0",
     "@discordjs/voice": "^0.14.0",
+    "@nodegui/nodegui": "^0.59.0",
     "@types/node-notifier": "^8.0.2",
     "axios": "^0.24.0",
     "chokidar": "^3.5.3",

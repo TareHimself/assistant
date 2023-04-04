@@ -1,6 +1,6 @@
 import torch
 from neural.model import IntentsNeuralNet
-from neural.utils import build_vocab, tokenize
+from neural.utils import build_vocab, tokenize, PYTORCH_DEVICE
 from neural.train import train_intents
 
 
@@ -10,27 +10,24 @@ class IntentsEngine:
 
         train_intents(intents, model_path)
         self.data = torch.load(model_path)
-        self.model = IntentsNeuralNet(
-            self.data['input'], self.data['e_dim'], self.data['hidden'], self.data['output'])
 
-        self.vocab = build_vocab(self.data['words'])
+        self.model = IntentsNeuralNet(
+            self.data['hidden'], self.data['output']).to(PYTORCH_DEVICE)
         self.model.load_state_dict(self.data['state'])
         self.model.eval()
 
     def update_intents(self, intents: list):
         train_intents(intents, self.model_path)
 
-        self.model = IntentsNeuralNet(
-            self.data['input'], self.data['e_dim'], self.data['hidden'], self.data['output'])
-        self.vocab = build_vocab(self.data['words'])
+        self.model = IntentsNeuralNet(self.data['hidden'], self.data['output']).to(PYTORCH_DEVICE)
         self.model.load_state_dict(self.data['state'])
         self.model.eval()
 
     def get_intent(self, msg: str):
         sentence = tokenize(msg)
-        x = self.vocab(sentence)
-        x = torch.IntTensor(x)
-        output = self.model(x, torch.IntTensor([0]))
+        mask = sentence['attention_mask'].to(PYTORCH_DEVICE)
+        input_id = sentence['input_ids'].to(PYTORCH_DEVICE)
+        output = self.model(input_id, mask)
         _, predicated = torch.max(output, dim=1)
 
         probs = torch.softmax(output, dim=1)

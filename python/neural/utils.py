@@ -2,7 +2,16 @@ import hashlib
 import re
 from torchtext.data.utils import get_tokenizer
 from torchtext.vocab import build_vocab_from_iterator
+from transformers import BertTokenizer, DistilBertTokenizer
 from numwrd import num2wrd
+import torch
+
+
+EMBEDDINGS_MODEL = 'distilbert-base-uncased'
+PYTORCH_DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+bert_tokenizer = DistilBertTokenizer.from_pretrained(EMBEDDINGS_MODEL)
+
 
 _tokenizer = get_tokenizer('basic_english')
 
@@ -19,20 +28,22 @@ def build_vocab(words: list):
 
 
 def tokenize(text: str):
-    tokens = []
-    split_tok = text.split(" ")
+    return bert_tokenizer(text, padding='max_length', max_length=512, return_attention_mask=True,
+                          truncation=True, return_tensors="pt")
+    # tokens = []
+    # split_tok = text.split(" ")
 
-    for tok in split_tok:
-        cur = tok.strip().lower()
-        if len(cur) <= 0:
-            continue
+    # for tok in split_tok:
+    #     cur = tok.strip().lower()
+    #     if len(cur) <= 0:
+    #         continue
 
-        if cur.isnumeric():
-            tokens.append(num2wrd(int(cur)))
-        else:
-            tokens.append(cur)
+    #     if cur.isnumeric():
+    #         tokens.append(num2wrd(int(cur)))
+    #     else:
+    #         tokens.append(cur)
 
-    return tokens
+    # return tokens
     #
     # tokens = _tokenizer(text)
     # return

@@ -33,8 +33,9 @@ function convertPath(original: string) {
 		return original.startsWith(p);
 	});
 
-	if (targetPath)
+	if (targetPath) {
 		return path.join(PATH_DICT[targetPath], original.slice(targetPath.length));
+	}
 
 	return original;
 }
