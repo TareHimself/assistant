@@ -122,6 +122,7 @@ export abstract class Loadable extends EventEmitter {
 }
 
 export abstract class LoadableWithId extends Loadable {
+	// an id for this class i.e. 'loadable', 'some-class'
 	get id() {
 		throw new Error('Something that requires an id does not have one!');
 		return '';

@@ -40,7 +40,7 @@ class IntentsNeuralNet(nn.Module):
 
         self.em = DistilBertModel.from_pretrained(EMBEDDINGS_MODEL)
         self.fc = nn.Sequential(
-            nn.Dropout(0.3),
+            nn.Dropout(0.4),
             nn.Linear(768, num_classes),
             nn.ReLU(),
         )

@@ -18,6 +18,10 @@ export class DesktopContext extends AssistantContext {
 		return 'desktop-io';
 	}
 
+	override get sessionId(): string {
+		return this.id + '-user';
+	}
+
 	override async onLoad() {}
 
 	override async reply(data: string): Promise<boolean> {

@@ -81,47 +81,6 @@ class ArithmeticSkill extends AssistantSkill<ArithmeticSkillData> {
 	}
 }
 
-class AppOpenCloseSkill extends AssistantSkill<null> {
-	override get intents(): IIntent[] {
-		return [
-			{
-				tag: 'skill_app_open',
-				examples: [
-					'launch spotify',
-					'open google',
-					'launch in the morning i will die',
-					'open my balls n your jaw',
-					'launch microsoft edge',
-					'open epic games',
-					'launch keyboard maker',
-					'open mic tuner',
-					'launch supa hot fire',
-					'open sexy ladies',
-					'launch no mans sky',
-					'open genshin impact',
-				],
-			},
-			{
-				tag: 'skill_app_close',
-				examples: [
-					'close spotify',
-					'quit google',
-					'close osu',
-					'close vscode',
-					'quit microsoft edge',
-					'quit epic games',
-					'close steam',
-					'close no mans sky',
-				],
-			},
-		];
-	}
-
-	override async dataExtractor(instance: SkillInstance): Promise<null> {
-		return null;
-	}
-}
-
 type GenerateImageSkillData = {
 	tags: string;
 };
@@ -249,31 +208,6 @@ class GenerateImageSkill extends AssistantSkill<GenerateImageSkillData> {
 	}
 }
 
-class WebSearchSkill extends AssistantSkill<null> {
-	override get intents(): IIntent[] {
-		return [
-			{
-				tag: 'skill_web_search',
-				examples: [
-					'look up men in suits',
-					'google balls in your jaw video',
-					'search for math answers',
-					'look up great pretender',
-					'google wacha cha cha',
-					'search gibrish ',
-					'look up men in suits',
-					'google man',
-					'search The quick brown fox jumps over the lazy dog',
-				],
-			},
-		];
-	}
-
-	override async dataExtractor(instance: SkillInstance): Promise<null> {
-		return null;
-	}
-}
-
 type IScheduleAddParams = {
 	task: string;
 	time: string;
@@ -333,7 +267,7 @@ class TimeSkill extends AssistantSkill<null> {
 		return [
 			{
 				tag: 'skill_time',
-				examples: ['what time is it', 'what is the time', 'time'],
+				examples: ['what time is it', 'time'],
 			},
 		];
 	}
@@ -422,8 +356,6 @@ export default class BasePlugin extends AssistantPlugin {
 	override async getSkills(): Promise<AssistantSkill[]> {
 		return [
 			new ArithmeticSkill(),
-			new AppOpenCloseSkill(),
-			new WebSearchSkill(),
 			new TimeSkill(),
 			new ScheduleSkill(),
 			new SpeakSkill(),

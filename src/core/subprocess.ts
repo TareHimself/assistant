@@ -1,71 +1,74 @@
 import { ELoadableState, Loadable } from '@core/base';
 import { Awaitable } from '@core/types';
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
+import { v4 as uuidv4 } from 'uuid';
 import net from 'net';
 import path from 'path';
-import { createServer } from 'net';
+// import { createServer } from 'net';
 
-function isPortAvailable(port: number, type: 'IPv4' | 'IPv6' = 'IPv4') {
-	return new Promise((resolve) => {
-		const server = require('http')
-			.createServer()
-			.listen(port, () => {
-				server.close();
-				resolve(true);
-			})
-			.on('error', () => {
-				resolve(false);
-			});
-	});
-}
+// function isPortAvailable(port: number, type: 'IPv4' | 'IPv6' = 'IPv4') {
+// 	return new Promise((resolve) => {
+// 		const server = require('http')
+// 			.createServer()
+// 			.listen(port, () => {
+// 				server.close();
+// 				resolve(true);
+// 			})
+// 			.on('error', () => {
+// 				resolve(false);
+// 			});
+// 	});
+// }
 
-class PortFinder {
-	currentPort: number;
-	pendingPortRequests: ((ports: [number, number]) => void)[] = [];
-	isSearchingForPorts: boolean = false;
-	constructor(startPort: number) {
-		this.currentPort = startPort;
-	}
+// class PortFinder {
+// 	currentPort: number;
+// 	pendingPortRequests: ((ports: [number, number]) => void)[] = [];
+// 	isSearchingForPorts: boolean = false;
+// 	constructor(startPort: number) {
+// 		this.currentPort = startPort;
+// 	}
 
-	async searchForPorts() {
-		this.isSearchingForPorts = true;
+// 	async searchForPorts() {
+// 		this.isSearchingForPorts = true;
 
-		const currentCallback = this.pendingPortRequests.pop();
+// 		const currentCallback = this.pendingPortRequests.pop();
 
-		if (!currentCallback) {
-			this.isSearchingForPorts = false;
-			return;
-		}
+// 		if (!currentCallback) {
+// 			this.isSearchingForPorts = false;
+// 			return;
+// 		}
 
-		while (!isPortAvailable(this.currentPort)) {
-			this.currentPort += 2;
-		}
+// 		while (!isPortAvailable(this.currentPort)) {
+// 			this.currentPort += 2;
+// 		}
 
-		currentCallback([this.currentPort, this.currentPort + 1]);
-		this.currentPort += 2;
-		setImmediate(this.searchForPorts.bind(this));
-	}
+// 		currentCallback([this.currentPort, this.currentPort + 1]);
+// 		this.currentPort += 2;
+// 		setImmediate(this.searchForPorts.bind(this));
+// 	}
 
-	async getAvailablePort(): Promise<[number, number]> {
-		return new Promise<[number, number]>((res) => {
-			this.pendingPortRequests.push(res);
-			if (!this.isSearchingForPorts) {
-				this.searchForPorts();
-			}
-		});
-	}
-}
+// 	async getAvailablePort(): Promise<[number, number]> {
+// 		return new Promise<[number, number]>((res) => {
+// 			this.pendingPortRequests.push(res);
+// 			if (!this.isSearchingForPorts) {
+// 				this.searchForPorts();
+// 			}
+// 		});
+// 	}
+// }
 
-const PORT_SEARCHER = new PortFinder(9000);
+// const PORT_SEARCHER = new PortFinder(9000);
 
-let LAST_PORT_USED = 9000;
+// let LAST_PORT_USED = 9000;
 
-const PACKET_START = '<pk-region>';
-const PACKET_END = '<pk-region/>';
+const PACKET_START = `<pk-region-${uuidv4()}>`;
+const PACKET_END = `</pk-region-${uuidv4()}>`;
+const PACKET_HEADER_DELIM = `<pk-header-end-${uuidv4()}/>`;
 
-const [PACKET_START_BUFF, PACKET_END_BUFF] = [
+const [PACKET_START_BUFF, PACKET_END_BUFF, PACKET_HEADER_DELIM_BUFF] = [
 	Buffer.from(PACKET_START),
 	Buffer.from(PACKET_END),
+	Buffer.from(PACKET_HEADER_DELIM),
 ];
 
 export type SubProcessCreator<S extends SubProcess, T> = (master: T) => S;
@@ -119,45 +122,47 @@ export class SubProcess extends Loadable {
 		const onConnected = this.onClientConnected.bind(this);
 		this.tcpServer.on('connection', onConnected);
 		this.addBoundEvent(this.tcpServer, 'connection', onConnected);
-		(async () => {
-			const [s, c] = await PORT_SEARCHER.getAvailablePort();
 
-			this.serverPort = s;
-			this.clientPort = c;
+		this.tcpServer.listen(0, '127.0.0.1', () => {
+			const address = this.tcpServer.address() as net.AddressInfo;
+
+			this.process = spawn(executable, [
+				this.filePath,
+				address.port.toString(),
+				PACKET_HEADER_DELIM,
+				PACKET_START,
+				PACKET_END,
+				...args,
+			]);
+
+			const onSpawnCallback = () => this.emit('onProcessSpawned');
+			this.process.on('spawn', onSpawnCallback);
+			this.addBoundEvent(this.process, 'spawn', onSpawnCallback);
+
+			const onStdOut = (c: Buffer) => this.emit('onProcessStdout', c);
+			this.process.stdout.on('data', onStdOut);
+			this.addBoundEvent(this.process.stdout, 'data', onStdOut);
+
+			const onErrorCallback = (c: Buffer) => this.emit('onProcessError', c);
+			this.process.stderr.on('data', onErrorCallback);
+			this.addBoundEvent(this.process.stderr, 'data', onErrorCallback);
+
+			const onExitCallback = (c: number | null, s: NodeJS.Signals | null) =>
+				this.emit('onProcessExit', c, s);
+			this.process.on('exit', onExitCallback);
+			this.addBoundEvent(this.process, 'exit', onExitCallback);
 			console.info(`Started process ${this.filePath}`);
-			this.tcpServer.listen(this.serverPort, '127.0.0.1', () => {
-				this.process = spawn(executable, [
-					this.filePath,
-					this.serverPort.toString(),
-					this.clientPort.toString(),
-					PACKET_START,
-					PACKET_END,
-					...args,
-				]);
+			// this.on('onProcessError', (b) =>
+			// 	console.error(this.filePath, b.toString())
+			// );
 
-				const onSpawnCallback = () => this.emit('onProcessSpawned');
-				this.process.on('spawn', onSpawnCallback);
-				this.addBoundEvent(this.process, 'spawn', onSpawnCallback);
+			// this.on('onProcessStdout', (b) =>
+			// 	console.error(this.filePath, b.toString())
+			// );
+		});
 
-				const onStdOut = (c: Buffer) => this.emit('onProcessStdout', c);
-				this.process.stdout.on('data', onStdOut);
-				this.addBoundEvent(this.process.stdout, 'data', onStdOut);
-
-				const onErrorCallback = (c: Buffer) => this.emit('onProcessError', c);
-				this.process.stderr.on('data', onErrorCallback);
-				this.addBoundEvent(this.process.stderr, 'data', onErrorCallback);
-
-				const onExitCallback = (c: number | null, s: NodeJS.Signals | null) =>
-					this.emit('onProcessExit', c, s);
-				this.process.on('exit', onExitCallback);
-				this.addBoundEvent(this.process, 'exit', onExitCallback);
-			});
-		})();
-		this.once('onPacket', () => {
-			if (
-				this.state !== ELoadableState.ACTIVE &&
-				this.state !== ELoadableState.LOADING
-			) {
+		this.on('onPacket', (op) => {
+			if (this.state !== ELoadableState.ACTIVE && op === -1) {
 				this.load();
 			}
 		});
@@ -184,7 +189,8 @@ export class SubProcess extends Loadable {
 						break;
 					}
 				} else {
-					throw new Error('An abomination has occured');
+					pendingData = currentData;
+					currentData = Buffer.alloc(0);
 				}
 			}
 
@@ -193,17 +199,27 @@ export class SubProcess extends Loadable {
 	}
 
 	_onPacket(packet: Buffer) {
-		this.emit('onPacket', packet.slice(0, 4).readInt32BE(), packet.slice(4));
+		const headerIndex = packet.indexOf(PACKET_HEADER_DELIM);
+		const packetHeader = JSON.parse(packet.slice(0, headerIndex).toString());
+		const actualPacket = packet.slice(headerIndex + PACKET_HEADER_DELIM.length);
+		this.emit('onPacket', packetHeader['op'], actualPacket);
 	}
 
 	async send(data: Buffer, op: number = 0) {
 		await this.waitForState(ELoadableState.ACTIVE);
-		const opBuff = Buffer.alloc(4);
-		opBuff.writeInt32BE(op);
+		// can add more stuff here later and it will just work
+		const packetHeader = {
+			op: op,
+		};
+
+		const opBuff = Buffer.from(JSON.stringify(packetHeader));
+
 		this.connectedClient?.write(
 			Buffer.concat([
 				PACKET_START_BUFF,
-				Buffer.concat([opBuff, data]),
+				opBuff,
+				PACKET_HEADER_DELIM_BUFF,
+				data,
 				PACKET_END_BUFF,
 			])
 		);

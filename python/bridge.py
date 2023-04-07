@@ -1,23 +1,21 @@
 import socket
 import sys
 import os
-from typing import Union, Callable
-from uuid import uuid4
-from math import ceil
-from datetime import datetime
+from typing import Callable
+import json
 from queue import Queue
 import pyaudio
 from threading import Thread
 
 NO_REQUIRED_PARAMS = 4
-SERVER_PORT, CLIENT_PORT, PACKET_START_DELIM, PACKET_END_DELIM = sys.argv[
+SERVER_PORT, PACKET_HEADER_DELIM, PACKET_START_DELIM, PACKET_END_DELIM = sys.argv[
     1:1 + NO_REQUIRED_PARAMS]
 sys.argv = [sys.argv[0]] + sys.argv[1 + NO_REQUIRED_PARAMS:len(sys.argv)]
 
-SERVER_PORT, CLIENT_PORT = int(SERVER_PORT), int(CLIENT_PORT)
+SERVER_PORT = int(SERVER_PORT)
 
-PACKET_START_DELIM, PACKET_END_DELIM = PACKET_START_DELIM.encode(
-), PACKET_END_DELIM.encode()
+PACKET_START_DELIM, PACKET_END_DELIM, PACKET_HEADER_DELIM = PACKET_START_DELIM.encode(
+), PACKET_END_DELIM.encode(), PACKET_HEADER_DELIM.encode()
 
 
 def debug(data: bytes):
@@ -81,11 +79,7 @@ def process_packet(packet: bytes, pending: bytes, on_complete_packet: Callable[[
             else:
                 break
         else:
-            end_index, end_len = get_end_index(remaining)
-            if end_index is not None:
-                raise "Something unholy has occured"
-            else:
-                return remaining
+            return remaining
     return remaining
 
 
@@ -99,7 +93,7 @@ class Bridge:
         self.sockThread.start()
 
     def ready(self):
-        self.send("READY".encode('utf-8'))
+        self.send("READY".encode('utf-8'), -1)
 
     def _run_tcp(self):
         pendingData = b''
@@ -112,15 +106,24 @@ class Bridge:
         self._send(packet, op)
 
     def _send(self, packet, op: int = 0):
+        packet_header = {
+            'op': op
+        }
+
         self.socket.sendall(PACKET_START_DELIM +
-                            op.to_bytes(4, 'big') + packet + PACKET_END_DELIM)
+                            json.dumps(packet_header).encode() + PACKET_HEADER_DELIM + packet + PACKET_END_DELIM)
 
     def kill(self):
         self.stop = True
 
     def on_packet(self, packet: bytes):
+        header_delim_index = packet.index(PACKET_HEADER_DELIM)
+        to_json = packet[0:header_delim_index].decode()
+        packet_header = json.loads(to_json)
+        packet_data = packet[header_delim_index +
+                             len(PACKET_HEADER_DELIM):len(packet)]
         for callback in self.callbacks:
-            callback(int.from_bytes(packet[0:4], "big"), packet[4:len(packet)])
+            callback(packet_header['op'], packet_data)
 
     def add_on_packet(self, callback: Callable[[int, bytes], None]):
         self.callbacks.append(callback)

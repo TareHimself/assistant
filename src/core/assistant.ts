@@ -1,7 +1,7 @@
 import { ELoadableState, Loadable, LoadableWithId } from './base';
 import { PLUGINS_PATH } from './paths';
 import { PythonProcess } from './subprocess';
-import { GoogleSearchResponse, IIntent } from './types';
+import { GoogleSearchResponse, IIntent, IPromptAnalysisResult } from './types';
 import * as fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -84,17 +84,22 @@ export class SkillInstance {
  */
 export class Assistant extends Loadable {
 	nluProcess: PythonProcess = new PythonProcess('intents.py');
+	chatProcess: PythonProcess = new PythonProcess('chat.py');
 	currentSkills: Map<string, AssistantSkill[]> = new Map();
 	currentPlugins: Map<string, AssistantPlugin> = new Map();
 	bIsDoingSkill: boolean = false;
-	bIsTrainingIntents: boolean = false;
 	intents: { [key: string]: string[] } = {};
 	trainTimer: ReturnType<typeof setTimeout> | null = null;
-	bIsExpectingCommand: boolean = false;
+	expectingCommandTimer: ReturnType<typeof setTimeout> | null = null;
 	activeSkills: Map<string, SkillInstance> = new Map();
+
+	get bIsExpectingCommand() {
+		return this.expectingCommandTimer !== null;
+	}
 
 	static WAKE_WORD = 'alice';
 	static SKILL_START_CONFIDENCE = 0.5;
+	static EXPECTING_COMMAND_TIMER = 1000 * 20;
 	constructor() {
 		super();
 		console.info('Loading assistant');
@@ -123,9 +128,11 @@ export class Assistant extends Loadable {
 			)
 		);
 		console.info('Plugins loaded');
-
-		console.info('Waiting for nlu process');
 		await this.nluProcess.waitForState(ELoadableState.ACTIVE);
+		console.info('nlu process ready');
+		await this.chatProcess.waitForState(ELoadableState.ACTIVE);
+		console.info('chat process ready');
+
 		console.info('Training Intents');
 		await this.trainIntents();
 		console.info('Done Training Intents');
@@ -134,9 +141,6 @@ export class Assistant extends Loadable {
 	}
 
 	async trainIntents() {
-		if (this.bIsTrainingIntents) return;
-		this.bIsTrainingIntents = true;
-
 		const intentsToTrain = Object.keys(this.intents).reduce<IIntent[]>(
 			(all, intent) => {
 				all.push({
@@ -157,8 +161,6 @@ export class Assistant extends Loadable {
 			),
 			2
 		);
-
-		this.bIsTrainingIntents = false;
 	}
 
 	getPlugin(plugin: string) {
@@ -209,42 +211,90 @@ export class Assistant extends Loadable {
 		return [parseFloat(dataRecieved[0]), dataRecieved[1]];
 	}
 
+	async getChat(phrase: string): Promise<string> {
+		const [_, packet] = await this.chatProcess.sendAndWait(
+			Buffer.from(phrase),
+			0
+		);
+
+		return packet.toString();
+	}
+
+	async analyzePrompt(
+		prompt: string,
+		bIsVerifiedPrompt: boolean
+	): Promise<IPromptAnalysisResult> {
+		prompt = prompt.trim();
+
+		if (bIsVerifiedPrompt || this.bIsExpectingCommand) {
+			return {
+				similarity: 1,
+				fullPrompt: prompt,
+				command: prompt,
+			};
+		}
+
+		const wakeWordLength = Assistant.WAKE_WORD.split(' ').length;
+		const splitPrompt = prompt.split(' ');
+		const triggerWordsInPrompt = splitPrompt.slice(0, wakeWordLength);
+		const command = splitPrompt.slice(wakeWordLength).join(' ').trim();
+
+		return {
+			similarity: compareTwoStrings(
+				Assistant.WAKE_WORD.toLowerCase(),
+				triggerWordsInPrompt.join(' ').toLowerCase()
+			),
+			fullPrompt: prompt,
+			command: command,
+		};
+	}
+
+	stopExpecting() {
+		if (this.expectingCommandTimer !== null) {
+			clearTimeout(this.expectingCommandTimer);
+			this.expectingCommandTimer = null;
+		}
+	}
+
+	startExpecting() {
+		if (this.expectingCommandTimer) {
+			this.stopExpecting();
+		}
+
+		this.expectingCommandTimer = setTimeout(() => {
+			this.stopExpecting();
+			console.info('Timed out waiting for command');
+		}, Assistant.EXPECTING_COMMAND_TIMER);
+	}
+
 	async tryStartSkill(
 		prompt: string,
 		context: AssistantContext,
 		bIsVerifiedPrompt: boolean = false
 	) {
-		if (this.state !== ELoadableState.ACTIVE) return [];
+		const promptAnalysis = await this.analyzePrompt(prompt, bIsVerifiedPrompt);
 
-		prompt = prompt.trim();
+		console.log(promptAnalysis);
 
-		if (!bIsVerifiedPrompt) {
-			if (
-				prompt.toLowerCase() === Assistant.WAKE_WORD &&
-				!this.bIsExpectingCommand
-			) {
-				this.bIsExpectingCommand = true;
-				context.reply('Yes?');
-				return [];
-			} else if (this.bIsExpectingCommand) {
-				if (!prompt.toLowerCase().startsWith(Assistant.WAKE_WORD)) {
-					prompt = `${Assistant.WAKE_WORD} ` + prompt;
-				}
-				this.bIsExpectingCommand = false;
-			}
-
-			//console.info(prompt, similarity);
-			if (!prompt.toLowerCase().startsWith(Assistant.WAKE_WORD)) return [];
-
-			prompt = prompt.substring(5).trim();
-
-			if (this.bIsTrainingIntents || this.state !== ELoadableState.ACTIVE) {
-				context.reply('I am unavailable right now, please try again later.');
-				return [];
-			}
+		if (promptAnalysis.similarity < 0.8) {
+			return [];
 		}
 
-		const [confidence, intent] = await this.getIntent(prompt);
+		this.stopExpecting();
+
+		if (promptAnalysis.command === '') {
+			this.startExpecting();
+			context.reply('Yes.');
+			return [];
+		}
+
+		if (this.state !== ELoadableState.ACTIVE) {
+			await context.reply('I cannot respond to requests yet');
+			return [];
+		}
+
+		const [confidence, intent] = await this.getIntent(promptAnalysis.command);
+
 		if (confidence > Assistant.SKILL_START_CONFIDENCE) {
 			const skills = this.currentSkills.get(intent);
 
@@ -256,14 +306,19 @@ export class Assistant extends Loadable {
 			}
 
 			const skillsToStart = skills.filter((s) => {
-				if (s.shouldExecute(intent, context, prompt)) {
+				if (s.shouldExecute(intent, context, promptAnalysis.command)) {
 					return true;
 				}
 				return false;
 			});
 
 			const activationIds = skillsToStart.map((s) => {
-				const skillInstance = new SkillInstance(context, prompt, intent, s);
+				const skillInstance = new SkillInstance(
+					context,
+					promptAnalysis.command,
+					intent,
+					s
+				);
 
 				skillInstance.run();
 
@@ -277,16 +332,22 @@ export class Assistant extends Loadable {
 		}
 
 		try {
-			const searchResponse = (
-				await GoogleSearch.get<GoogleSearchResponse<string>>(
-					`/search?${new URLSearchParams({
-						s: prompt,
-					}).toString()}`
-				)
-			).data;
+			const response = await this.getChat(promptAnalysis.command);
+			// const searchResponse = (
+			// 	await GoogleSearch.get<GoogleSearchResponse<string>>(
+			// 		`/search?${new URLSearchParams({
+			// 			s: promptAnalysis.command,
+			// 		}).toString()}`
+			// 	)
+			// ).data;
 
-			if (!searchResponse.error) {
-				context.reply(searchResponse.result);
+			// if (!searchResponse.error) {
+			// 	context.reply(searchResponse.result);
+			// 	return [];
+			// }
+
+			if (response.length) {
+				context.reply(response);
 				return [];
 			}
 		} catch (error) {
@@ -304,6 +365,11 @@ export class Assistant extends Loadable {
  */
 export abstract class AssistantContext extends LoadableWithId {
 	assistant: Assistant;
+
+	// the id of this contexts session i.e. the user id combined with the context id to reference who this context is communicating with
+	get sessionId() {
+		return this.id + uuidv4();
+	}
 
 	constructor() {
 		super();

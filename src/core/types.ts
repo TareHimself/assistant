@@ -23,6 +23,12 @@ export type GoogleSearchResponse<T> = {
 	error: boolean;
 };
 
+export interface IPromptAnalysisResult {
+	similarity: number;
+	fullPrompt: string;
+	command: string;
+}
+
 declare global {
 	namespace NodeJS {
 		// Alias for compatibility
