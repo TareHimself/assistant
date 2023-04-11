@@ -207,7 +207,6 @@ export class Assistant extends Loadable {
 			1
 		);
 		const dataRecieved = nluPacket.toString().split('|');
-		console.info(phrase, dataRecieved);
 		return [parseFloat(dataRecieved[0]), dataRecieved[1]];
 	}
 
@@ -274,8 +273,6 @@ export class Assistant extends Loadable {
 	) {
 		const promptAnalysis = await this.analyzePrompt(prompt, bIsVerifiedPrompt);
 
-		console.log(promptAnalysis);
-
 		if (promptAnalysis.similarity < 0.8) {
 			return [];
 		}
@@ -293,8 +290,11 @@ export class Assistant extends Loadable {
 			return [];
 		}
 
+		console.log(promptAnalysis);
+
 		const [confidence, intent] = await this.getIntent(promptAnalysis.command);
 
+		console.info(confidence, intent);
 		if (confidence > Assistant.SKILL_START_CONFIDENCE) {
 			const skills = this.currentSkills.get(intent);
 

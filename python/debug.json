@@ -1,0 +1,125 @@
+{
+    "intents": [
+        {
+            "tag": "skill_arithmetic",
+            "examples": [
+                "[math | calculate | arithmetic] <e-expr>nine minus six</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>9 minus 4000</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>nine minus 6</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>9 minus six</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>[7 | seven] times six</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>[11 | eleven] divided by seventeen</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>[30 | thirty] plus one</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>[40 | fourty] [* | times] [40 | forty]</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>[seventy one | 71] [times | *] [sixty | 60]</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>[fifty | 50] [/ | divided by] [ninety | 90]</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>[thirty five | 35] [+ | plus] [70 | seventy]</e-expr>",
+                "[math | calculate | arithmetic] <e-expr>[ten | 10] plus [59 | fifty nine]</e-expr>"
+            ]
+        },
+        {
+            "tag": "skill_time",
+            "examples": [
+                "what time is it",
+                "time"
+            ]
+        },
+        {
+            "tag": "skill_schedule_add",
+            "examples": [
+                "remind me to smoke weed at five am",
+                "remind me to take a shit by twelve pm",
+                "remind me to stop in an hour",
+                "remind me to jump off my roof, then call some people in a second",
+                "remind me to go to sleep immediately in forty eight hours twelve minutes and seventy seconds",
+                "remind me to do a thing and then another thing, with more things in fifteen minutes and thirty nine seconds",
+                "remind me to sleep in twenty five seconds and ten minutes",
+                "remind me to wear my socks in thirty nine minutes and three days",
+                "remind me to die in ten minutes"
+            ]
+        },
+        {
+            "tag": "skill_self_say",
+            "examples": [
+                "[say | speak] <e-text>[what time is it | what is the time | remind me to do something | italian baby | wakanda forever]</e-text>",
+                "[say | speak] <e-text>[sea shells and shit | can i put this in your mouth | when can i become human]</e-text>",
+                "[say | speak] <e-text>The red van was pulling a trailer with a beat-up lawn mower on it</e-text>",
+                "[say | speak] <e-text>Everything has a beginning and an end</e-text>",
+                "[say | speak] <e-text>We can go to the oark</e-text>",
+                "[say | speak] <e-text>I don't like the polluted atmosphere of big cities</e-text>",
+                "[say | speak] <e-text>She constantly thought she was one mistake away from being fired</e-text>",
+                "[say | speak] <e-text>It's the biggest sports shop in the region</e-text>",
+                "[say | speak] <e-text>My home is bright pink and has yellow flowers growing all around it</e-text>",
+                "[say | speak] <e-text>I’m a hundred percent certain that it is going to rain later today</e-text>",
+                "[say | speak] <e-text>Sit down and shut up</e-text>",
+                "[say | speak] <e-text>I brought home the trophy</e-text>",
+                "[say | speak] <e-text>Business costs will go down</e-text>",
+                "[say | speak] <e-text>I need to go home</e-text>",
+                "[say | speak] <e-text>A list of required hardware is available here</e-text>",
+                "[say | speak] <e-text>The bigger boys torment the little ones</e-text>",
+                "[say | speak] <e-text>I miss my girlfriend</e-text>",
+                "[say | speak] <e-text>Workers will not be empowered</e-text>",
+                "[say | speak] <e-text>He’s as proud as a peacock</e-text>",
+                "[say | speak] <e-text>Tom made a big donation to the hospital</e-text>",
+                "[say | speak] <e-text>He has a nice sum of money put away</e-text>",
+                "[say | speak] <e-text>We should be able to resolve our differences</e-text>"
+            ]
+        },
+        {
+            "tag": "test_prompt",
+            "examples": [
+                "prompt test"
+            ]
+        },
+        {
+            "tag": "skill_generate_anime",
+            "examples": [
+                "generate <e-prompt>beans</e-prompt>",
+                "generate <e-prompt>school</e-prompt>",
+                "generate <e-prompt>house</e-prompt>",
+                "generate <e-prompt>[white hair | blue eyes | white dress | pink lips ], [glasses | horns | purple eyes], [skirt | ember skin]</e-prompt>",
+                "generate <e-prompt>red trees, 1girl, two tables</e-prompt>",
+                "generate <e-prompt>masterpiece, best quality, upper body, 1girl, looking at viewer, red hair, medium hair, purple eyes, demon horns, black coat, indoors</e-prompt>",
+                "generate <e-prompt>masterpiece, big booty, thick, goth, woman, purple eyes</e-prompt>",
+                "generate <e-prompt>ninja, shuriken, katana, stealth, assassin</e-prompt>",
+                "generate <e-prompt>chef, apron, rolling pin, spatula</e-prompt>",
+                "generate <e-prompt>wizard, hat, wand, spells, magic</e-prompt>",
+                "generate <e-prompt>detective, magnifying glass, trench coat, fedora</e-prompt>",
+                "generate <e-prompt>athlete, jersey, sweatband, sneakers, water bottle</e-prompt>",
+                "generate <e-prompt>pirate, eyepatch, parrot, peg leg</e-prompt>",
+                "generate <e-prompt>vampire, fangs, coffin, cape, blood</e-prompt>",
+                "generate <e-prompt>werewolf, claws, full moon, howl</e-prompt>",
+                "generate <e-prompt>superhero, mask, cape, superpowers, secret identity</e-prompt>",
+                "generate <e-prompt>angel, wings, halo, divine, guardian</e-prompt>",
+                "generate <e-prompt>devil, horns, pitchfork, fiery, tempter</e-prompt>",
+                "generate <e-prompt>robot, circuit board, laser eyes, artificial intelligence</e-prompt>",
+                "generate <e-prompt>mermaid, seashell bra, tail, underwater, mythical</e-prompt>",
+                "generate <e-prompt>cowboy, hat, boots, spurs, lasso</e-prompt>",
+                "generate <e-prompt>spy, sunglasses, briefcase, stealth, espionage</e-prompt>",
+                "generate <e-prompt>musician, guitar, microphone, stage, performance</e-prompt>",
+                "generate <e-prompt>firefighter, axe, helmet, hose, bravery</e-prompt>",
+                "generate <e-prompt>samurai, armor, sword, honor, bushido</e-prompt>",
+                "generate <e-prompt>ghost, chains, white sheet, haunting, supernatural</e-prompt>",
+                "generate <e-prompt>2B, nier automata, woman, game, character, big booty</e-prompt>",
+                "generate <e-prompt>wings, horns, red hair, medieval dress, girl, standing on a cliff, demon, sword</e-prompt>",
+                "generate <e-prompt>glowing eyes, fur, ripped jeans, male, monster, black hair, smoking a cigarette, leather jacket, motorcycle",
+                "generate <e-prompt>dark alley, woman, witch, black dress, purple hair, holding a spell book, glowing red eyes</e-prompt>",
+                "generate <e-prompt>beach scene, merman, blue hair, trident, tattoos, seashell necklace, man</e-prompt>",
+                "generate <e-prompt>futuristic space station, android, red eyes, silver hair, holding a laser sword, black bodysuit, woman</e-prompt>",
+                "generate <e-prompt>concert stage, male, rockstar, leather pants, ripped shirt, electric guitar, long hair, tattoos",
+                "generate <e-prompt>snowy forest, girl, white hair, wolf ears, blue eyes, holding a staff, fur cloak</e-prompt>",
+                "generate <e-prompt>abandoned warehouse, woman, assassin, black catsuit, red eyes, short black hair, holding a knife</e-prompt>",
+                "generate <e-prompt>moonlit garden, vampire, woman, red dress, long black hair, holding a glass of red wine</e-prompt>",
+                "generate <e-prompt>underwater ruins, mermaid, pink hair, trident, scales, green eyes, woman</e-prompt>",
+                "generate <e-prompt>post-apocalyptic wasteland, man, survivor, gas mask, brown trench coat, holding a shotgun</e-prompt>",
+                "generate <e-prompt>enchanted forest, elf, girl, green hair, pointed ears, holding a bow and arrow, brown eyes</e-prompt>",
+                "generate <e-prompt>cyberpunk city, woman, hacker, black bodysuit, pink hair, holding a laptop, red eyes</e-prompt>",
+                "generate <e-prompt>dark castle, man, warlock, red robes, bald, holding a crystal ball, white beard</e-prompt>",
+                "generate <e-prompt>amusement park, clown, woman, red nose, polka dot dress, holding a balloon animal</e-prompt>",
+                "generate <e-prompt>ancient temple, man, archeologist, fedora hat, brown leather jacket, holding a torch</e-prompt>",
+                "generate <e-prompt>mystical garden, woman, druid, green dress, long brown hair, holding a staff</e-prompt>",
+                "generate <e-prompt>jungle scene, man, explorer, pith helmet, khaki shirt, holding a machete</e-prompt>"
+            ]
+        }
+    ]
+}

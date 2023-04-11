@@ -1,6 +1,6 @@
 import torch
 from neural.utils import EMBEDDINGS_MODEL
-from transformers import BertModel,DistilBertModel
+from transformers import BertModel, BertForTokenClassification
 from torch import nn, mm, Tensor
 import torch.nn.functional as F
 
@@ -32,13 +32,13 @@ import torch.nn.functional as F
 #         x = self.fc(pooled_output)
 
 #         return x
-    
+
 
 class IntentsNeuralNet(nn.Module):
     def __init__(self, hidden_size, num_classes):
         super().__init__()
 
-        self.em = DistilBertModel.from_pretrained(EMBEDDINGS_MODEL)
+        self.em = BertModel.from_pretrained(EMBEDDINGS_MODEL)
         self.fc = nn.Sequential(
             nn.Dropout(0.4),
             nn.Linear(768, num_classes),
@@ -53,3 +53,18 @@ class IntentsNeuralNet(nn.Module):
         x = self.fc(pooled_output)
 
         return x
+
+
+class EntityExtractor(nn.Module):
+
+    def __init__(self, num_entities) -> None:
+        super().__init__()
+        self.em = BertForTokenClassification.from_pretrained(
+            EMBEDDINGS_MODEL, num_labels=num_entities)
+
+    def forward(self, input_id, mask, label):
+
+        output = self.em(input_ids=input_id, attention_mask=mask,
+                         labels=label, return_dict=False)
+
+        return output

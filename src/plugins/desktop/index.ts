@@ -71,7 +71,7 @@ export default class DesktopPlugin extends AssistantPlugin {
 				this.pendingCallback = null;
 				return;
 			}
-			console.info('Trying to start skill with phrase', pack.toString());
+
 			bus.assistant.tryStartSkill(pack.toString(), new DesktopContext(this));
 		});
 

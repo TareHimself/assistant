@@ -152,13 +152,13 @@ export class SubProcess extends Loadable {
 			this.process.on('exit', onExitCallback);
 			this.addBoundEvent(this.process, 'exit', onExitCallback);
 			console.info(`Started process ${this.filePath}`);
-			// this.on('onProcessError', (b) =>
-			// 	console.error(this.filePath, b.toString())
-			// );
+			this.on('onProcessError', (b) =>
+				console.error(this.filePath, b.toString())
+			);
 
-			// this.on('onProcessStdout', (b) =>
-			// 	console.error(this.filePath, b.toString())
-			// );
+			this.on('onProcessStdout', (b) =>
+				console.error(this.filePath, b.toString())
+			);
 		});
 
 		this.on('onPacket', (op) => {

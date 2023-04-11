@@ -146,6 +146,6 @@ export function customConsoleError(...args: any[]) {
 
 console.info = customConsoleInfo;
 
-console.warn = customConsoleError;
+console.warn = customConsoleWarn;
 
 console.error = customConsoleError;
