@@ -2,10 +2,8 @@ import { AssistantContext, AssistantPlugin } from '@core/assistant';
 import { ELoadableState } from '@core/base';
 import { PythonProcess } from '@core/subprocess';
 import { v4 as uuidv4 } from 'uuid';
-import os from 'os';
 import path from 'path';
 import * as fs from 'fs';
-import { exec } from 'child_process';
 import { BrowserWindow } from 'electron';
 export class DesktopContext extends AssistantContext {
 	plugin: DesktopPlugin;
