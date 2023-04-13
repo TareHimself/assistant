@@ -71,8 +71,6 @@ const [PACKET_START_BUFF, PACKET_END_BUFF, PACKET_HEADER_DELIM_BUFF] = [
 	Buffer.from(PACKET_HEADER_DELIM),
 ];
 
-export type SubProcessCreator<S extends SubProcess, T> = (master: T) => S;
-
 export interface ISubProcessEvents {
 	onProcessStdout: (chunk: Buffer) => Awaitable<void>;
 	onProcessSpawned: () => Awaitable<void>;
@@ -152,6 +150,7 @@ export class SubProcess extends Loadable {
 			this.process.on('exit', onExitCallback);
 			this.addBoundEvent(this.process, 'exit', onExitCallback);
 			console.info(`Started process ${this.filePath}`);
+
 			this.on('onProcessError', (b) =>
 				console.error(this.filePath, b.toString())
 			);

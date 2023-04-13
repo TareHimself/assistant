@@ -1,12 +1,13 @@
 import { ELoadableState, Loadable, LoadableWithId } from './base';
-import { PLUGINS_PATH } from './paths';
+import { DATA_PATH, PLUGINS_PATH } from './paths';
 import { PythonProcess } from './subprocess';
 import { GoogleSearchResponse, IIntent, IPromptAnalysisResult } from './types';
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { compareTwoStrings } from 'string-similarity';
-import { GoogleSearch } from './api';
+import { app } from 'electron';
 
 /**
  * The base class for all assistant skills.
@@ -86,12 +87,16 @@ export class Assistant extends Loadable {
 	nluProcess: PythonProcess = new PythonProcess('intents.py');
 	chatProcess: PythonProcess = new PythonProcess('chat.py');
 	currentSkills: Map<string, AssistantSkill[]> = new Map();
-	currentPlugins: Map<string, AssistantPlugin> = new Map();
+	plugins: Map<string, AssistantPlugin> = new Map();
 	bIsDoingSkill: boolean = false;
 	intents: { [key: string]: string[] } = {};
 	trainTimer: ReturnType<typeof setTimeout> | null = null;
 	expectingCommandTimer: ReturnType<typeof setTimeout> | null = null;
 	activeSkills: Map<string, SkillInstance> = new Map();
+
+	get dataPath() {
+		return path.join(DATA_PATH, 'core');
+	}
 
 	get bIsExpectingCommand() {
 		return this.expectingCommandTimer !== null;
@@ -107,12 +112,27 @@ export class Assistant extends Loadable {
 	}
 
 	override async onLoad() {
-		this.nluProcess.on('onProcessStdout', (b) =>
-			console.info(b.toString('ascii'))
-		);
-		this.nluProcess.on('onProcessError', (b) =>
-			console.info(b.toString('ascii'))
-		);
+		if (!fsSync.existsSync(this.dataPath)) {
+			await fs.mkdir(this.dataPath, {
+				recursive: true,
+			});
+		}
+
+		console.info('Loading Electron App');
+		if (!app.isReady()) {
+			await new Promise<void>((res) => {
+				app.once('ready', () => {
+					res();
+				});
+			});
+		}
+		console.info('Loaded Electron App');
+		// this.nluProcess.on('onProcessStdout', (b) =>
+		// 	console.info(b.toString('ascii'))
+		// );
+		// this.nluProcess.on('onProcessError', (b) =>
+		// 	console.info(b.toString('ascii'))
+		// );
 		console.info('Loading plugins');
 		const plugins = await fs.readdir(PLUGINS_PATH);
 
@@ -157,14 +177,15 @@ export class Assistant extends Loadable {
 			Buffer.from(
 				JSON.stringify({
 					tags: intentsToTrain,
+					model: path.join(this.dataPath, 'intents.pt'),
 				})
 			),
 			2
 		);
 	}
 
-	getPlugin(plugin: string) {
-		return this.currentPlugins.get(plugin);
+	getPlugin<T extends AssistantPlugin = AssistantPlugin>(plugin: string) {
+		return this.plugins.get(plugin) as T | undefined;
 	}
 
 	addIntent(intent: IIntent) {
@@ -198,6 +219,7 @@ export class Assistant extends Loadable {
 		});
 
 		await Promise.all(skills.map((skill) => this.useSkill(skill)));
+		this.plugins.set(plugin.id, plugin);
 		return this;
 	}
 
@@ -401,6 +423,18 @@ export abstract class AssistantPlugin extends LoadableWithId {
 		this.assistant = bus.assistant;
 	}
 
+	get dataPath() {
+		return path.join(DATA_PATH, 'plugins', this.id);
+	}
+
+	override async load(): Promise<void> {
+		if (!fsSync.existsSync(this.dataPath)) {
+			await fs.mkdir(this.dataPath, {
+				recursive: true,
+			});
+		}
+		return await super.load();
+	}
 	async getIntents(): Promise<IIntent[]> {
 		return [];
 	}

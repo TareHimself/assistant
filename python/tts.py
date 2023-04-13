@@ -3,8 +3,8 @@ import time
 import torch
 import sounddevice as sd
 from os import path
-from bridge import Bridge, debug_string
-from bridge import AudioStream, debug
+from bridge import Bridge
+import sys
 torch._C._jit_set_profiling_mode(False)
 
 device = torch.device('cpu')
@@ -17,13 +17,16 @@ TTS_URL = 'https://models.silero.ai/models/tts/en/v3_en.pt'
 CHANNELS = 1
 # VB Cable D INPUT 14  #
 OUTPUT_DEVICE = None  # 4
-MODEL_DIR = "tts.pt"
+_,MODEL_PATH = sys.argv
+MODEL_PATH = path.join(MODEL_PATH,'tts.pt')
 
-if not path.exists(MODEL_DIR):
-    torch.hub.download_url_to_file(TTS_URL, MODEL_DIR)
+if not path.exists(MODEL_PATH):
+    torch.hub.download_url_to_file(TTS_URL, MODEL_PATH)
+
+
 
 model = torch.package.PackageImporter(
-    MODEL_DIR).load_pickle("tts_models", "model")
+    MODEL_PATH).load_pickle("tts_models", "model")
 
 model.to(device)
 

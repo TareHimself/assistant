@@ -4,8 +4,7 @@
   "description": "A voice assistant",
   "main": "./dist/index.js",
   "scripts": {
-    "start": "node --es-module-specifier-resolution=node ./dist/index.js --inspect",
-    "debug": "node --es-module-specifier-resolution=node ./dist/index.js --no-cache --no-cluster --debug",
+    "start": "electron --trace-warnings ./dist/index.js",
     "build": "npm run clean && npx tsc",
     "watch": "npm run build && tsc-watch",
     "plugin": "node ./scripts/create-plugin.js",
@@ -52,6 +51,7 @@
     "@typescript-eslint/eslint-plugin": "^5.24.0",
     "@typescript-eslint/parser": "^5.24.0",
     "concurrently": "^7.6.0",
+    "electron": "^24.1.1",
     "eslint": "^8.36.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-config-standard": "^17.0.0",

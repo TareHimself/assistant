@@ -1,11 +1,11 @@
 import json
 import time
 from vosk import Model, KaldiRecognizer, SetLogLevel
-from bridge import Bridge, AudioStream, debug_string
+from bridge import Bridge, AudioStream
 import os
 from os import getcwd, path
 import sounddevice as sd
-
+import sys
 SetLogLevel(-1)
 
 SAMPLE_RATE = 16000
@@ -14,7 +14,8 @@ AUDIO_DEVICE = None
 testSocket = Bridge()
 recognizer = None
 
-VOSK_MODEL_DIR = ""
+_, MODEL_PATH = sys.argv
+MODEL_PATH = path.join(MODEL_PATH, 'stt')
 
 
 def on_voice_chunk(d):
@@ -24,8 +25,7 @@ def on_voice_chunk(d):
             testSocket.send(result.encode('utf-8'))
 
 
-model = Model(model_path=path.join(
-    os.path.dirname(os.path.realpath(__file__)), 'stt'))
+model = Model(model_path=MODEL_PATH)
 recognizer = KaldiRecognizer(model, SAMPLE_RATE)
 audio = AudioStream(callback=on_voice_chunk, chunk=8000,
                     samplerate=SAMPLE_RATE, device=AUDIO_DEVICE)

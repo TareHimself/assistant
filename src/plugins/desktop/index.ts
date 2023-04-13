@@ -6,6 +6,7 @@ import os from 'os';
 import path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
+import { BrowserWindow } from 'electron';
 export class DesktopContext extends AssistantContext {
 	plugin: DesktopPlugin;
 
@@ -25,10 +26,11 @@ export class DesktopContext extends AssistantContext {
 	override async onLoad() {}
 
 	override async reply(data: string): Promise<boolean> {
-		this.plugin.tts.sendAndWait(
-			Buffer.from(data + (data.endsWith('.') ? '' : '.')),
-			1
-		);
+		let final = data + (data.endsWith('.') ? '' : '.');
+
+		final = final.replaceAll('?', '.');
+
+		this.plugin.tts?.sendAndWait(Buffer.from(final), 1);
 		return true;
 	}
 
@@ -47,14 +49,18 @@ export class DesktopContext extends AssistantContext {
 	override async replyImage(data: Buffer): Promise<boolean> {
 		const imageDir = path.join(this.plugin.tempDir, uuidv4() + '.png');
 		await fs.promises.writeFile(imageDir, data);
-		exec(`"${imageDir}"`);
+		const displayWindow = new BrowserWindow({});
+		displayWindow.on('close', () => {
+			fs.unlinkSync(imageDir);
+		});
+		await displayWindow.loadURL(`file:///${imageDir}`);
 		return true;
 	}
 }
 
 export default class DesktopPlugin extends AssistantPlugin {
-	tts = new PythonProcess('tts.py');
-	stt = new PythonProcess('stt.py');
+	tts?: PythonProcess;
+	stt?: PythonProcess;
 	tempDir = '';
 	pendingCallback: ((data: string) => void) | null = null;
 
@@ -63,6 +69,8 @@ export default class DesktopPlugin extends AssistantPlugin {
 	}
 
 	override async onLoad(): Promise<void> {
+		this.tts = new PythonProcess('tts.py', [this.dataPath]);
+		this.stt = new PythonProcess('stt.py', [this.dataPath]);
 		await this.stt.waitForState(ELoadableState.ACTIVE);
 		await this.tts.waitForState(ELoadableState.ACTIVE);
 		this.stt.on('onPacket', (_, pack) => {
@@ -75,10 +83,7 @@ export default class DesktopPlugin extends AssistantPlugin {
 			bus.assistant.tryStartSkill(pack.toString(), new DesktopContext(this));
 		});
 
-		this.tempDir = path.join(
-			os.tmpdir(),
-			'assistant-desktop-plugin-' + uuidv4()
-		);
+		this.tempDir = path.join(this.dataPath, 'temp');
 
 		try {
 			await fs.promises.mkdir(this.tempDir, {

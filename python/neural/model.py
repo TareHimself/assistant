@@ -1,70 +1,19 @@
 import torch
-from neural.utils import EMBEDDINGS_MODEL
-from transformers import BertModel, BertForTokenClassification
+
 from torch import nn, mm, Tensor
 import torch.nn.functional as F
 
 
-# class IntentsNeuralNet(nn.Module):
-#     def __init__(self, hidden_size, num_classes):
-#         super().__init__()
-
-#         self.em = BertModel.from_pretrained(EMBEDDINGS_MODEL)
-#         self.fc = nn.Sequential(
-#             nn.Dropout(0.5),
-#             nn.Linear(768, num_classes),
-#             nn.ReLU(),
-#         )
-
-#         # self.fc = nn.Sequential(
-#         #     nn.Dropout(0.5),
-#         #     nn.Linear(768, hidden_size),
-#         #     nn.ReLU(),
-#         #     nn.Dropout(0.5),
-#         #     nn.Linear(hidden_size, num_classes),
-#         #     nn.ReLU()
-#         # )
-
-#     def forward(self, input_id, mask):
-#         _, pooled_output = self.em(
-#             input_ids=input_id, attention_mask=mask, return_dict=False)
-
-#         x = self.fc(pooled_output)
-
-#         return x
-
-
 class IntentsNeuralNet(nn.Module):
-    def __init__(self, hidden_size, num_classes):
+    def __init__(self, vocab_dize, embed_dimensions, hidden_size, num_classes):
         super().__init__()
 
-        self.em = BertModel.from_pretrained(EMBEDDINGS_MODEL)
-        self.fc = nn.Sequential(
-            nn.Dropout(0.4),
-            nn.Linear(768, num_classes),
-            nn.ReLU(),
-        )
+        self.em = nn.EmbeddingBag(vocab_dize, embed_dimensions, sparse=False)
+        self.fc1 = nn.Linear(embed_dimensions, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, num_classes)
 
-    def forward(self, input_ids, mask):
-        distilbert_output = self.em(input_ids=input_ids, attention_mask=mask)
-        hidden_state = distilbert_output[0]
-        pooled_output = hidden_state[:, 0]
-
-        x = self.fc(pooled_output)
-
+    def forward(self, tokens: Tensor, offsets: Tensor):
+        x = self.em(tokens, offsets)
+        x = torch.tanh(self.fc1(x))
+        x = self.fc2(x)
         return x
-
-
-class EntityExtractor(nn.Module):
-
-    def __init__(self, num_entities) -> None:
-        super().__init__()
-        self.em = BertForTokenClassification.from_pretrained(
-            EMBEDDINGS_MODEL, num_labels=num_entities)
-
-    def forward(self, input_id, mask, label):
-
-        output = self.em(input_ids=input_id, attention_mask=mask,
-                         labels=label, return_dict=False)
-
-        return output

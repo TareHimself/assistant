@@ -11,7 +11,10 @@ process.env = {
 	...process.env,
 	...require('../keys.json'),
 };
+import { app } from 'electron';
 import { Assistant } from '@core/assistant';
+
+app.on('window-all-closed', () => {});
 
 global.bus = {
 	assistant: new Assistant(),

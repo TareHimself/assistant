@@ -1,3 +1,4 @@
+import path from 'path';
 import { createInterface } from 'readline';
 
 export function pad(number: number, ammount = 5) {

@@ -6,23 +6,19 @@ from neural import IntentsEngine
 from typing import Union
 
 mainProcess = Bridge()
-
-INTENTS_FILE_PATH = path.join(getcwd(), 'intents.json')
-MODEL_FILE_PATH = path.join(getcwd(), 'intent_model.pt')
-
-
 engine: Union[IntentsEngine, None] = None
 
 
 def on_packet(op, buffer: bytes):
     global engine
     if op == 2:
+        json_data = json.loads(buffer.decode())
         if engine is None:
-            engine = IntentsEngine(list(json.loads(buffer.decode())[
-                'tags']).copy(), MODEL_FILE_PATH)
+            engine = IntentsEngine(list(json_data[
+                'tags']).copy(), json_data['model'])
         else:
             engine.update_intents(
-                list(json.loads(buffer.decode())['tags']).copy())
+                list(json_data['tags']).copy())
         mainProcess.send('Done'.encode(), op)
     elif op == 1 and engine is not None:
         confidence, intent = engine.get_intent(buffer.decode())

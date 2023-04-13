@@ -37,6 +37,8 @@ declare global {
 			PYTHON_EXECUTABLE_PATH: string;
 			TELEGRAM_BOT_TOKEN: string;
 			TENOR_KEY: string;
+			SPOTIFY_CLIENT_ID: string;
+			SPOTIFY_CLIENT_SECRETE: string;
 		}
 	}
 

@@ -121,6 +121,9 @@ class TelegramContext extends AssistantContext {
 }
 
 export default class TelegramPlugin extends AssistantPlugin {
+	override get id(): string {
+		return 'telegram-plugin';
+	}
 	proxy: Client = new Client('assistant', 'wss://proxy.oyintare.dev/', false);
 	pendingUserInputs: {
 		[key: string]: (message: ITelegramContextPayload) => void;
