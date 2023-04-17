@@ -4,15 +4,13 @@
   "description": "A voice assistant",
   "main": "./dist/index.js",
   "scripts": {
-    "start": "electron-forge start",
+    "start": "electron --unhandled-rejections=strict ./dist/index.js",
     "build": "npm run clean && npx tsc",
     "watch": "npm run build && tsc-watch",
     "plugin": "node ./scripts/create-plugin.js",
     "pretty": "npx prettier --write .",
     "clean": "node ./scripts/clean.js",
-    "copy-plugin-assets": "node ./scripts/copy-plugin-assets.js",
-    "package": "electron-forge package",
-    "make": "electron-forge make"
+    "copy-plugin-assets": "node ./scripts/copy-plugin-assets.js"
   },
   "keywords": [],
   "author": "Oyintare",
@@ -20,8 +18,6 @@
   "dependencies": {
     "@discordjs/opus": "^0.9.0",
     "@discordjs/voice": "^0.14.0",
-    "@nodegui/nodegui": "^0.59.0",
-    "@types/node-notifier": "^8.0.2",
     "axios": "^0.24.0",
     "chokidar": "^3.5.3",
     "compression": "^1.7.4",
@@ -38,16 +34,15 @@
     "https": "^1.0.0",
     "libsodium-wrappers": "^0.7.11",
     "mathjs": "^11.7.0",
+    "realm": "^11.8.0",
     "string-similarity": "^4.0.4",
     "uuid": "^9.0.0",
-    "words-to-numbers": "^1.5.1",
     "ws": "^8.12.1"
   },
   "devDependencies": {
     "@babel/core": "^7.21.0",
     "@babel/eslint-parser": "^7.19.1",
     "@babel/node": "^7.15.4",
-    "@electron-forge/cli": "^6.1.1",
     "@electron-forge/maker-deb": "^6.1.1",
     "@electron-forge/maker-rpm": "^6.1.1",
     "@electron-forge/maker-squirrel": "^6.1.1",

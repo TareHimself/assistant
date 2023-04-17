@@ -29,6 +29,11 @@ export interface IPromptAnalysisResult {
 	command: string;
 }
 
+export interface IClassificationResult {
+	confidence: number;
+	intent: string;
+}
+
 declare global {
 	namespace NodeJS {
 		// Alias for compatibility

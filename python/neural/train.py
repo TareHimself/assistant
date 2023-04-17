@@ -6,7 +6,6 @@ from neural.model import IntentsNeuralNet
 from torch.utils.data import DataLoader
 from os import path
 from neural.utils import hash_intents, expand_all_examples
-from bridge import debug_string
 from tqdm import tqdm
 
 PYTORCH_DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -18,10 +17,10 @@ def train_intents(intents: list, save_path: str, batch_size=64, learning_rate=0.
     if path.exists(save_path):
         old_data: dict = torch.load(save_path)
         if old_data.get('hash', "") == intents_hash:
-            debug_string("No need to train new model, loading existing")
+            print("No need to train new model, loading existing")
             return
 
-    debug_string("Training new model")
+    print("Training new model")
     dataset = IntentsDataset(intents)
 
     def collate_data(batch):
@@ -54,7 +53,7 @@ def train_intents(intents: list, save_path: str, batch_size=64, learning_rate=0.
     embed_dim = 300
     hidden_size = 128
     output_size = len(dataset.tags)
-    debug_string("device" + PYTORCH_DEVICE.__str__())
+    print("device" + PYTORCH_DEVICE.__str__())
     model = IntentsNeuralNet(input_size, embed_dim,
                              hidden_size, output_size).to(PYTORCH_DEVICE)
     criterion = nn.CrossEntropyLoss()
@@ -71,6 +70,7 @@ def train_intents(intents: list, save_path: str, batch_size=64, learning_rate=0.
             # print(label, text)
 
             outputs = model(text, offsets)
+            
             loss = criterion(outputs, label)
 
             optimizer.zero_grad()

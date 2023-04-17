@@ -84,29 +84,27 @@ export interface ISubProcessEvents {
 
 export class SubProcess extends Loadable {
 	process?: ChildProcessWithoutNullStreams;
-	serverPort: number;
-	clientPort: number;
 	filePath: string;
 	tcpServer: net.Server;
 	connectedClient?: net.Socket;
 	pendingBuff: Buffer = Buffer.alloc(0);
 
-	on: <T extends keyof ISubProcessEvents>(
+	on!: <T extends keyof ISubProcessEvents>(
 		eventName: T,
 		listener: ISubProcessEvents[T]
 	) => this;
 
-	once: <T extends keyof ISubProcessEvents>(
+	once!: <T extends keyof ISubProcessEvents>(
 		eventName: T,
 		listener: ISubProcessEvents[T]
 	) => this;
 
-	off: <T extends keyof ISubProcessEvents>(
+	off!: <T extends keyof ISubProcessEvents>(
 		eventName: T,
 		listener: ISubProcessEvents[T]
 	) => this;
 
-	emit: <T extends keyof ISubProcessEvents>(
+	emit!: <T extends keyof ISubProcessEvents>(
 		eventName: T,
 		...args: Parameters<ISubProcessEvents[T]>
 	) => boolean;

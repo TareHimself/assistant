@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import * as fs from 'fs';
 import { BrowserWindow } from 'electron';
+import { digitsToWords } from '@core/conversion';
 export class DesktopContext extends AssistantContext {
 	plugin: DesktopPlugin;
 
@@ -26,8 +27,16 @@ export class DesktopContext extends AssistantContext {
 	override async reply(data: string): Promise<boolean> {
 		let final = data + (data.endsWith('.') ? '' : '.');
 
-		final = final.replaceAll('?', '.');
+		final = final
+			.replaceAll('?', '.')
+			.replaceAll(':', ' ')
+			.replaceAll('am', 'ai em')
+			.replaceAll('pm', 'pee em');
 
+		final = digitsToWords(final);
+		this.plugin.window.webContents.executeJavaScript(
+			`displayText("${data}",10000)`
+		);
 		this.plugin.tts?.sendAndWait(Buffer.from(final), 1);
 		return true;
 	}
@@ -57,9 +66,21 @@ export class DesktopContext extends AssistantContext {
 }
 
 export default class DesktopPlugin extends AssistantPlugin {
-	tts?: PythonProcess;
-	stt?: PythonProcess;
+	tts: PythonProcess;
+	stt: PythonProcess;
+	window: BrowserWindow;
 	tempDir = '';
+
+	constructor() {
+		super();
+		this.tts = new PythonProcess('tts.py', [this.dataPath]);
+		this.stt = new PythonProcess('stt.py', [this.dataPath]);
+		this.window = new BrowserWindow({
+			show: true,
+			autoHideMenuBar: true,
+		});
+	}
+
 	pendingCallback: ((data: string) => void) | null = null;
 
 	override get id(): string {
@@ -67,10 +88,11 @@ export default class DesktopPlugin extends AssistantPlugin {
 	}
 
 	override async onLoad(): Promise<void> {
-		this.tts = new PythonProcess('tts.py', [this.dataPath]);
-		this.stt = new PythonProcess('stt.py', [this.dataPath]);
 		await this.stt.waitForState(ELoadableState.ACTIVE);
 		await this.tts.waitForState(ELoadableState.ACTIVE);
+
+		this.window.loadFile(path.join(this.dataPath, 'index.html'));
+		//this.window.webContents.openDevTools();
 		this.stt.on('onPacket', (_, pack) => {
 			if (this.pendingCallback) {
 				this.pendingCallback(pack.toString());

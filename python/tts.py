@@ -15,14 +15,13 @@ TTS_SPEAKER = 'en_10'
 TTS_URL = 'https://models.silero.ai/models/tts/en/v3_en.pt'
 
 CHANNELS = 1
-# VB Cable D INPUT 14  #
-OUTPUT_DEVICE = None  # 4
-_,MODEL_PATH = sys.argv
-MODEL_PATH = path.join(MODEL_PATH,'tts.pt')
+# VB Cable B INPUT 16  #
+OUTPUT_DEVICE = 16  # 4
+_, MODEL_PATH = sys.argv
+MODEL_PATH = path.join(MODEL_PATH, 'tts.pt')
 
 if not path.exists(MODEL_PATH):
     torch.hub.download_url_to_file(TTS_URL, MODEL_PATH)
-
 
 
 model = torch.package.PackageImporter(

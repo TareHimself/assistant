@@ -120,6 +120,7 @@ class SpotifyPlaySkill extends AssistantSkill<SpotifyPlayData> {
 	}
 }
 
+function auth() {}
 class SpotifyApi extends Loadable {
 	plugin: SpotifyPlugin;
 	authPath: string = '';
@@ -145,6 +146,9 @@ class SpotifyApi extends Loadable {
 			) as ISpotifyAuth;
 			if (auth.scopes === SpotifyApi.SCOPES) {
 				this.auth = auth;
+				if (this.auth.refresh_at < Date.now()) {
+					await this.refreshToken();
+				}
 				return;
 			} else {
 				await fs.promises.unlink(this.authPath);
@@ -181,8 +185,6 @@ class SpotifyApi extends Loadable {
 		);
 
 		try {
-			const form = new FormData();
-
 			const response = await axios.post<{
 				access_token: string;
 				expires_in: number;
@@ -215,6 +217,53 @@ class SpotifyApi extends Loadable {
 				this.authPath,
 				JSON.stringify(this.auth, null, 4)
 			);
+			setTimeout(
+				this.refreshToken.bind(this),
+				Date.now() - this.auth.refresh_at
+			);
+		} catch (error) {
+			console.error(error);
+		}
+	}
+
+	async refreshToken() {
+		try {
+			const response = await axios.post<{
+				access_token: string;
+				expires_in: number;
+				refresh_token: string;
+			}>(
+				'https://accounts.spotify.com/api/token',
+				new URLSearchParams({
+					grant_type: 'refresh_token',
+					refresh_token: this.auth.refresh,
+				}).toString(),
+				{
+					headers: {
+						Authorization: `Basic ${Buffer.from(
+							`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRETE}`
+						).toString('base64')}`,
+						'Content-Type': 'application/x-www-form-urlencoded',
+					},
+				}
+			);
+
+			this.auth = {
+				token: response.data.access_token,
+				scopes: SpotifyApi.SCOPES,
+				refresh: this.auth.refresh,
+				refresh_at: response.data.expires_in * 1000 + Date.now(),
+			};
+
+			await fs.promises.writeFile(
+				this.authPath,
+				JSON.stringify(this.auth, null, 4)
+			);
+
+			setTimeout(
+				this.refreshToken.bind(this),
+				Date.now() - this.auth.refresh_at
+			);
 		} catch (error) {
 			console.error(error);
 		}
@@ -240,7 +289,6 @@ class SpotifyApi extends Loadable {
 	}
 
 	async playTrackUris(uris: string[]) {
-		console.log(uris);
 		await axios.put(
 			'https://api.spotify.com/v1/me/player/play',
 			{

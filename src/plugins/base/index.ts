@@ -16,7 +16,7 @@ type ArithmeticSkillData = {
 	expression: string;
 };
 class ArithmeticSkill extends AssistantSkill<ArithmeticSkillData> {
-	static OPERATORS = {
+	static OPERATORS: Record<string, string> = {
 		'divided by': '/',
 		times: '*',
 		'multiplied by': '',
@@ -283,7 +283,7 @@ class TimeSkill extends AssistantSkill<null> {
 				'@ans',
 				`${
 					date.getHours() !== 12 ? date.getHours() % 12 : date.getHours()
-				}:${pad(date.getMinutes())} ${date.getHours() < 12 ? 'am' : 'pm'}`
+				}:${pad(date.getMinutes(), 2)} ${date.getHours() < 12 ? 'am' : 'pm'}`
 			)
 		);
 	}

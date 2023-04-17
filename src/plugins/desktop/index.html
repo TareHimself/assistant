@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>Desktop</title>
+    <meta name="description" content="Our first page">
+</head>
+<style>
+    body {
+        display: flex;
+        background-color: #222;
+        flex-direction: column;
+        margin: 0;
+        height: 100vh;
+        width: 100vw;
+    }
+
+    bars-content {
+        display: flex;
+        flex: 1;
+        justify-content: space-evenly;
+        margin: 0 20px;
+        padding: 20px 0;
+        box-sizing: border-box;
+        align-items: center;
+    }
+
+    text-content {
+        display: flex;
+        justify-content: center;
+    }
+
+    audio-bar {
+        display: flex;
+        width: 5px;
+        max-width: 5px;
+        min-width: 5px;
+        min-height: 5px;
+        border-radius: 5px;
+        background-color: white;
+    }
+
+    h1 {
+        font-family: 'Roboto', sans-serif;
+        font-weight: bold;
+        display: block;
+        color: white;
+        font-size: 25px;
+    }
+</style>
+
+<body>
+    <bars-content id="bars">
+
+    </bars-content>
+    <text-content>
+        <h1 id="text">...</h1>
+    </text-content>
+</body>
+
+</html>
+<script>
+    async function main() {
+        const element = document.getElementById('bars')
+        const fftSize = 2 ** 7;
+        const barCount = fftSize / 2;
+        for (let i = 0; i < barCount; i++) {
+            element.appendChild(document.createElement("audio-bar"))
+        }
+        const devices = (await navigator.mediaDevices.enumerateDevices()).filter(a => a.kind === "audioinput" && a.label.toLowerCase().includes('cable-b'))[0];
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                deviceId: devices.deviceId
+            }
+        })
+
+        const audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyserNode = audioContext.createAnalyser();
+        source.connect(analyserNode);
+        analyserNode.fftSize = fftSize; // set the FFT size
+        analyserNode.smoothingTimeConstant = 0.9; // set the smoothing time constant
+        const frequencyData = new Uint8Array(analyserNode.frequencyBinCount);
+        analyserNode.getByteFrequencyData(frequencyData);
+        const temp = (new Array(barCount).fill(0, 0)).map((a, idx) => idx)
+        const indexMap = Array
+            .from(temp.keys())
+            .sort((a, b) => b % 2 - a % 2 || (a % 2 ? b - a : a - b))
+            .map(i => temp[i])
+
+        function movingAverage(arr, windowSize, strength = 0.3) {
+            var halfWindow = Math.floor(windowSize / 2);
+            var weights = [];
+            for (var i = 0; i < windowSize; i++) {
+                var dist = Math.abs(i - halfWindow);
+                var weight = Math.pow(strength, dist);
+                weights.push(weight);
+            }
+            var smoothed = [];
+            for (var i = 0; i < arr.length; i++) {
+                var sum = 0;
+                var count = 0;
+                for (var j = Math.max(0, i - halfWindow); j <= Math.min(arr.length - 1, i + halfWindow); j++) {
+                    var weight = weights[Math.abs(i - j)];
+                    sum += weight * arr[j];
+                    count += weight;
+                }
+                smoothed.push(sum / count);
+            }
+            return smoothed;
+        }
+
+        function updateVisualization() {
+            requestAnimationFrame(updateVisualization);
+            analyserNode.getByteFrequencyData(frequencyData);
+            // Update the visualization with the new frequency data
+            const sortedData = movingAverage(indexMap.map(a => frequencyData[a]), 2)
+            sortedData.forEach((row, idx) => {
+                element.children[idx].style.height = `${Math.max(Math.min(row / 400, 1), 0) * 100}%`
+            })
+        }
+        updateVisualization()
+        console.log(devices)
+    }
+
+    main()
+</script>
+<script>
+    let pendingTimeout = null
+    function displayText(text, duration) {
+
+        clearTimeout(pendingTimeout);
+
+        const h1 = document.getElementById('text')
+
+        h1.textContent = text
+
+        pendingTimeout = setTimeout(() => {
+            h1.textContent = '...'
+        }, duration)
+    }
+</script>

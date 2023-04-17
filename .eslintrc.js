@@ -1,5 +1,4 @@
 module.exports = {
-	requireConfigFile: false,
 	env: {
 		browser: true,
 		commonjs: true,
@@ -9,6 +8,7 @@ module.exports = {
 
 	parserOptions: {
 		ecmaVersion: 'latest',
+		requireConfigFile: false,
 	},
 	parser: '@babel/eslint-parser',
 	rules: {

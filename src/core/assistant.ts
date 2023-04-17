@@ -1,7 +1,7 @@
 import { ELoadableState, Loadable, LoadableWithId } from './base';
 import { DATA_PATH, PLUGINS_PATH } from './paths';
 import { PythonProcess } from './subprocess';
-import { GoogleSearchResponse, IIntent, IPromptAnalysisResult } from './types';
+import { IClassificationResult, IIntent, IPromptAnalysisResult } from './types';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import path from 'path';
@@ -12,7 +12,7 @@ import { app } from 'electron';
 /**
  * The base class for all assistant skills.
  */
-export abstract class AssistantSkill<T extends any = any> extends Loadable {
+export abstract class AssistantSkill<T = unknown> extends Loadable {
 	constructor() {
 		super();
 	}
@@ -71,7 +71,7 @@ export class SkillInstance {
 		try {
 			const data = await this.skill.dataExtractor(this);
 			await this.skill.execute(this, data);
-		} catch (error) {
+		} catch (error: any) {
 			this.context.reply(`There was an error [${error.message}]`);
 			console.error(error);
 		}
@@ -80,11 +80,46 @@ export class SkillInstance {
 	}
 }
 
+export class IntentClassifier extends Loadable {
+	process = new PythonProcess('intents.py');
+	savePath: string;
+	constructor(savePath: string) {
+		super();
+		this.savePath = savePath;
+	}
+
+	override async onLoad(): Promise<void> {
+		await this.process.waitForState(ELoadableState.ACTIVE);
+	}
+
+	async train(intents: IIntent[]) {
+		await this.process.sendAndWait(
+			Buffer.from(
+				JSON.stringify({
+					tags: intents,
+					model: this.savePath,
+				})
+			),
+			2
+		);
+	}
+
+	async classify(text: string): Promise<IClassificationResult> {
+		const [_, nluPacket] = await this.process.sendAndWait(Buffer.from(text), 1);
+		const dataRecieved = nluPacket.toString().split('|');
+		return {
+			confidence: parseFloat(dataRecieved[0]),
+			intent: dataRecieved[1],
+		};
+	}
+}
 /**
  * The assistant
  */
 export class Assistant extends Loadable {
-	nluProcess: PythonProcess = new PythonProcess('intents.py');
+	classifier: IntentClassifier = new IntentClassifier(
+		path.join(this.dataPath, 'intents.pt')
+	);
 	chatProcess: PythonProcess = new PythonProcess('chat.py');
 	currentSkills: Map<string, AssistantSkill[]> = new Map();
 	plugins: Map<string, AssistantPlugin> = new Map();
@@ -93,6 +128,7 @@ export class Assistant extends Loadable {
 	trainTimer: ReturnType<typeof setTimeout> | null = null;
 	expectingCommandTimer: ReturnType<typeof setTimeout> | null = null;
 	activeSkills: Map<string, SkillInstance> = new Map();
+	pluginQueue: [AssistantPlugin, (ref: AssistantPlugin) => void][] = [];
 
 	get dataPath() {
 		return path.join(DATA_PATH, 'core');
@@ -109,6 +145,11 @@ export class Assistant extends Loadable {
 		super();
 		console.info('Loading assistant');
 		this.load();
+	}
+
+	override async onLoadError(error: Error): Promise<void> {
+		console.error(error);
+		process.exit();
 	}
 
 	override async onLoad() {
@@ -133,6 +174,7 @@ export class Assistant extends Loadable {
 		// this.nluProcess.on('onProcessError', (b) =>
 		// 	console.info(b.toString('ascii'))
 		// );
+
 		console.info('Loading plugins');
 		const plugins = await fs.readdir(PLUGINS_PATH);
 
@@ -148,19 +190,15 @@ export class Assistant extends Loadable {
 			)
 		);
 		console.info('Plugins loaded');
-		await this.nluProcess.waitForState(ELoadableState.ACTIVE);
-		console.info('nlu process ready');
+		console.info('Loading Intent classifier');
+		await this.classifier.load();
+		console.info('Intent classifier loaded');
+		console.info('Loading chat process');
 		await this.chatProcess.waitForState(ELoadableState.ACTIVE);
-		console.info('chat process ready');
+		console.info('Chat process loaded');
 
 		console.info('Training Intents');
-		await this.trainIntents();
-		console.info('Done Training Intents');
 
-		console.info('assistant ready');
-	}
-
-	async trainIntents() {
 		const intentsToTrain = Object.keys(this.intents).reduce<IIntent[]>(
 			(all, intent) => {
 				all.push({
@@ -173,15 +211,11 @@ export class Assistant extends Loadable {
 			[]
 		);
 
-		await this.nluProcess.sendAndWait(
-			Buffer.from(
-				JSON.stringify({
-					tags: intentsToTrain,
-					model: path.join(this.dataPath, 'intents.pt'),
-				})
-			),
-			2
-		);
+		await this.classifier.train(intentsToTrain);
+
+		console.info('Done Training Intents');
+
+		console.info('assistant ready');
 	}
 
 	getPlugin<T extends AssistantPlugin = AssistantPlugin>(plugin: string) {
@@ -212,6 +246,24 @@ export class Assistant extends Loadable {
 	}
 
 	async usePlugin(plugin: AssistantPlugin) {
+		return new Promise<AssistantPlugin>((res, rej) => {
+			if (this.pluginQueue.length) {
+				this.pluginQueue.push([plugin, res]);
+			} else {
+				this.pluginQueue.push([plugin, res]);
+				this.loadQueuedPlugins().catch(rej);
+			}
+		});
+	}
+
+	async loadQueuedPlugins() {
+		const toLoad = this.pluginQueue.pop();
+		if (!toLoad) {
+			return;
+		}
+
+		const [plugin, callback] = toLoad;
+
 		await plugin.load();
 		const skills = await plugin.getSkills();
 		(await plugin.getIntents()).forEach((i) => {
@@ -220,16 +272,7 @@ export class Assistant extends Loadable {
 
 		await Promise.all(skills.map((skill) => this.useSkill(skill)));
 		this.plugins.set(plugin.id, plugin);
-		return this;
-	}
-
-	async getIntent(phrase: string): Promise<[number, string]> {
-		const [_, nluPacket] = await this.nluProcess.sendAndWait(
-			Buffer.from(phrase),
-			1
-		);
-		const dataRecieved = nluPacket.toString().split('|');
-		return [parseFloat(dataRecieved[0]), dataRecieved[1]];
+		callback(plugin);
 	}
 
 	async getChat(phrase: string): Promise<string> {
@@ -314,9 +357,12 @@ export class Assistant extends Loadable {
 
 		console.log(promptAnalysis);
 
-		const [confidence, intent] = await this.getIntent(promptAnalysis.command);
+		const { confidence, intent } = await this.classifier.classify(
+			promptAnalysis.command
+		);
 
 		console.info(confidence, intent);
+
 		if (confidence > Assistant.SKILL_START_CONFIDENCE) {
 			const skills = this.currentSkills.get(intent);
 

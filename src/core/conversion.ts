@@ -1,4 +1,4 @@
-const WORDS_TO_DIGITS = {
+const WORDS_TO_DIGITS: { [key: string]: number | undefined } = {
 	one: 1,
 	two: 2,
 	three: 3,
@@ -28,7 +28,7 @@ const WORDS_TO_DIGITS = {
 	ninety: 90,
 };
 
-const WORDS_TO_DIGITS_EXPONENTS = {
+const WORDS_TO_DIGITS_EXPONENTS: { [key: string]: number | undefined } = {
 	hundred: 1e2,
 	thousand: 1e3,
 	million: 1e6,
@@ -36,7 +36,7 @@ const WORDS_TO_DIGITS_EXPONENTS = {
 	trillion: 1e12,
 };
 
-const DIGITS_TO_WORDS = {
+const DIGITS_TO_WORDS: { [key: string]: string | undefined } = {
 	'1': 'one',
 	'2': 'two',
 	'3': 'three',
@@ -66,7 +66,7 @@ const DIGITS_TO_WORDS = {
 	'90': 'ninety',
 };
 
-const DIGITS_TO_WORDS_EXPONENTS = {
+const DIGITS_TO_WORDS_EXPONENTS: { [key: string]: string | undefined } = {
 	1e3: 'thousand',
 	1e6: 'million',
 	1e9: 'billion',
@@ -93,14 +93,14 @@ export function wordsToDigits(words: string) {
 		if (WORDS_TO_DIGITS[item] !== undefined) {
 			if (pending.length === 0) pending = [0];
 
-			pending[0] += WORDS_TO_DIGITS[item];
+			pending[0] += WORDS_TO_DIGITS[item]!;
 
 			return result;
 		} else if (
 			WORDS_TO_DIGITS_EXPONENTS[item] !== undefined &&
 			pending.length > 0
 		) {
-			pending[0] = WORDS_TO_DIGITS_EXPONENTS[item] * pending[0];
+			pending[0] = WORDS_TO_DIGITS_EXPONENTS[item]! * pending[0];
 
 			if (
 				WORDS_TO_DIGITS_EXPONENTS[item] !== WORDS_TO_DIGITS_EXPONENTS['hundred']
@@ -129,8 +129,8 @@ export function wordsToDigits(words: string) {
 }
 
 export function digitToWord(digit: string | number) {
+	console.log('To convert', digit);
 	const digitAsString = typeof digit === 'string' ? digit : `${digit}`;
-
 	const indexes: string[] = [];
 
 	for (let i = digitAsString.length; i > 0; i -= 3) {
@@ -148,14 +148,16 @@ export function digitToWord(digit: string | number) {
 					: current.length === 1
 					? `xx${current}`
 					: `x${current}`;
-			let end = DIGITS_TO_WORDS_EXPONENTS[exponent] || '';
+			let end = DIGITS_TO_WORDS_EXPONENTS[exponent]
+				? DIGITS_TO_WORDS_EXPONENTS[exponent]
+				: '';
 			let start = DIGITS_TO_WORDS[item[0]]
 				? `${DIGITS_TO_WORDS[item[0]]} hundred`
 				: '';
 			let middle = '';
 			if (item[1] !== 'x') {
 				if (DIGITS_TO_WORDS[`${item[1]}${item[2]}`]) {
-					middle = DIGITS_TO_WORDS[`${item[1]}${item[2]}`];
+					middle = DIGITS_TO_WORDS[`${item[1]}${item[2]}`]!;
 				} else {
 					middle = `${DIGITS_TO_WORDS[`${item[1]}0`]} ${
 						DIGITS_TO_WORDS[`${item[2]}`]
@@ -172,6 +174,7 @@ export function digitToWord(digit: string | number) {
 			const curStatement =
 				[start, middle, end, idx === indexes.length - 2 ? ',' : ''].join(' ') +
 				' ';
+			console.log(curStatement, current, exponent);
 			idx++;
 			return final + curStatement;
 		}, '')
@@ -182,8 +185,9 @@ export function digitsToWords(digits: string) {
 	return digits
 		.split(' ')
 		.map((current) => {
-			if (current.match(DIGITS_REGEX)) {
-				return digitToWord(current);
+			const match = current.match(DIGITS_REGEX);
+			if (match) {
+				return current.replace(match[0], digitToWord(match[0]));
 			}
 			return current;
 		})
