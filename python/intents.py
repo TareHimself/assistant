@@ -21,8 +21,8 @@ def on_packet(op, buffer: bytes):
                 list(json_data['tags']).copy())
         mainProcess.send('Done'.encode(), op)
     elif op == 1 and engine is not None:
-        confidence, intent = engine.get_intent(buffer.decode())
-        mainProcess.send(f'{confidence}|{intent}'.encode(), op)
+        intent = engine.get_intent(buffer.decode())
+        mainProcess.send(json.dumps(intent).encode(), op)
     else:
         mainProcess.send(f'0|unk'.encode(), op)
 

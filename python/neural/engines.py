@@ -1,7 +1,7 @@
 import torch
-from neural.model import IntentsNeuralNet
-from neural.utils import build_vocab, tokenize
-from neural.train import train_intents
+from neural.model import IntentsNeuralNet, TokenClassificationNet
+from neural.utils import tokenize, Vocabulary
+from neural.train import train_intents, train_entities
 
 
 class IntentsEngine:
@@ -9,28 +9,48 @@ class IntentsEngine:
         self.model_path = model_path
 
         train_intents(intents, model_path)
-        self.data = torch.load(model_path)
-        self.model = IntentsNeuralNet(
-            self.data['input'], self.data['e_dim'], self.data['hidden'], self.data['output'])
 
-        self.vocab = build_vocab(self.data['words'])
-        self.model.load_state_dict(self.data['state'])
+        self.model = IntentsNeuralNet.load(model_path)
+
         self.model.eval()
 
     def update_intents(self, intents: list):
         train_intents(intents, self.model_path)
+        IntentsNeuralNet.load(self.model_path)
+        self.model.eval()
 
-        self.model = IntentsNeuralNet(
-            self.data['input'], self.data['e_dim'], self.data['hidden'], self.data['output'])
-        self.vocab = build_vocab(self.data['words'])
+    def get_intent(self, msg: str):
+        return self.model.predict(msg)
+
+
+class EntitiesEngine:
+    def __init__(self, intents: list, model_path: str):
+        self.model_path = model_path
+
+        train_entities(intents, model_path)
+        self.data = torch.load(model_path)
+        self.vocab = Vocabulary(self.data['vocab'])
+        self.model = TokenClassificationNet(
+            self.data['input'], self.data['e_dim'], self.data['hidden'], len(self.vocab))
+
+        self.model.load_state_dict(self.data['state'])
+        self.model.eval()
+
+    def update_intents(self, intents: list):
+        train_entities(intents, self.model_path)
+        self.vocab = Vocabulary(self.data['vocab'])
+
+        self.model = TokenClassificationNet(
+            self.data['input'], self.data['e_dim'], self.data['hidden'], len(self.vocab))
+
         self.model.load_state_dict(self.data['state'])
         self.model.eval()
 
     def get_intent(self, msg: str):
         sentence = tokenize(msg)
-        x = self.vocab(sentence)
+        x = self.vocab(sentence, 64)
         x = torch.IntTensor(x)
-        output = self.model(x, torch.IntTensor([0]))
+        output = self.model(x)
         _, predicated = torch.max(output, dim=1)
 
         probs = torch.softmax(output, dim=1)

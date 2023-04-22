@@ -1,11 +1,5 @@
 import { AssistantContext, AssistantPlugin } from '@core/assistant';
-import {
-	Client,
-	Events,
-	Partials,
-	GatewayIntentBits,
-	Message,
-} from 'discord.js';
+import { Client, Message } from 'discord.js-selfbot-v13';
 
 export interface IDiscordMessageInfo {
 	message: Message;
@@ -60,16 +54,7 @@ class DiscordContext extends AssistantContext {
 }
 
 export default class DiscordPlugin extends AssistantPlugin {
-	client = new Client({
-		intents: [
-			GatewayIntentBits.DirectMessages,
-			GatewayIntentBits.MessageContent,
-			GatewayIntentBits.GuildMessages,
-			GatewayIntentBits.GuildVoiceStates,
-			GatewayIntentBits.Guilds,
-		],
-		partials: [Partials.Message, Partials.Channel],
-	});
+	client = new Client({});
 
 	pendingUserInputs: { [key: string]: (message: Message) => void } = {};
 
@@ -78,7 +63,7 @@ export default class DiscordPlugin extends AssistantPlugin {
 	}
 
 	override async onLoad(): Promise<void> {
-		this.client.on(Events.MessageCreate, (message) => {
+		this.client.on('messageCreate', (message) => {
 			if (message.author.id === this.client.user?.id) {
 				return;
 			}
@@ -99,7 +84,7 @@ export default class DiscordPlugin extends AssistantPlugin {
 		});
 
 		await new Promise<void>((res, rej) => {
-			this.client.once(Events.ClientReady, (c) => {
+			this.client.once('ready', (c) => {
 				res();
 			});
 

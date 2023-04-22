@@ -1,41 +1,47 @@
 import hashlib
 import re
+import torch
 from torchtext.data.utils import get_tokenizer
 from torchtext.vocab import build_vocab_from_iterator
 from numwrd import num2wrd
 
+PYTORCH_DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 TOKENIZE_REGEX = r"[A-Za-z0-9!]+|[\"#$%&'()*+,\-.\/:;<=>?@\[\\\]^_`{|}~]+"
 ENTITIES_REGEX = r"<e-([a-z_]+)>(.+?)<\/e-\1>"
 EXTRACT_VARIATIONS_REGEX = r"\[(.*?)\]"
 
 
-def build_vocab(words: list):
-    vocab = build_vocab_from_iterator([words], min_freq=1,
-                                      specials=['<unk>'])
+class Vocabulary:
+    def __init__(self, initial={'<unk>': 0}, unknown_index=0) -> None:
 
-    vocab.set_default_index(vocab["<unk>"])
+        self.last_new_index = max(initial.values()) + 1
+        self.vocab = initial
+        self.unknown_index = unknown_index
 
-    return vocab
+    def add(self, items: list[str]):
+
+        for x in items:
+            if x not in self.vocab.keys():
+                self.vocab[x] = self.last_new_index
+                self.last_new_index += 1
+
+    def __len__(self):
+        return len(self.vocab.keys())
+
+    def index(self, item: str) -> int:
+        return self.vocab.get(item, self.unknown_index,)
+
+    def __call__(self, words: list, length: int) -> list[int]:
+        words_length = len(words)
+        return [self.index(words[x]) if x < words_length else self.unknown_index for x in range(length)]
+
 
 def split_text(text: str):
-    return re.findall(TOKENIZE_REGEX,text)
+    return re.findall(TOKENIZE_REGEX, text)
+
 
 def tokenize(text: str):
-    tokens = []
-    split_tok = split_text(text)
-
-    for tok in split_tok:
-        cur = tok.strip().lower()
-        if len(cur) <= 0:
-            continue
-
-        if cur.isnumeric():
-            tokens.append(num2wrd(int(cur)))
-        else:
-            tokens.append(cur)
-
-    return tokens
-
+    return list(map(lambda a: a.lower(), split_text(text)))
 
 
 def extract_entities(examples: list, prefix=''):
@@ -64,7 +70,7 @@ def extract_entities(examples: list, prefix=''):
             # ensure we have entires in the vocab
             all_entities.add(f"B-{prefix}{entity}")
             all_entities.add(f"I-{prefix}{entity}")
-            print(to_tag)
+
             # tag each word in the entity
             tagged = " ".join([f"B-{prefix}{entity}" if i ==
                                0 else f"I-{prefix}{entity}" for i in range(len(split_text(to_tag)))])
@@ -83,9 +89,10 @@ def extract_entities(examples: list, prefix=''):
         if len(remaining) > 0:
             entity_tags += " " + " ".join(['O' for x in split_text(
                 remaining[0:len(remaining)])])
-        computed.append((split_text(new_example), entity_tags.strip().split()))
+        computed.append((tokenize(new_example), entity_tags.strip().split()))
 
     return (all_entities, computed)
+
 
 def replace_at_depth(current_value, cur_depth, variations):
     if cur_depth < len(variations):

@@ -104,13 +104,11 @@ export class IntentClassifier extends Loadable {
 		);
 	}
 
-	async classify(text: string): Promise<IClassificationResult> {
+	async classify(text: string): Promise<IClassificationResult[]> {
 		const [_, nluPacket] = await this.process.sendAndWait(Buffer.from(text), 1);
-		const dataRecieved = nluPacket.toString().split('|');
-		return {
-			confidence: parseFloat(dataRecieved[0]),
-			intent: dataRecieved[1],
-		};
+		const dataRecieved = JSON.parse(nluPacket.toString());
+		console.log(dataRecieved);
+		return dataRecieved;
 	}
 }
 /**
@@ -357,9 +355,9 @@ export class Assistant extends Loadable {
 
 		console.log(promptAnalysis);
 
-		const { confidence, intent } = await this.classifier.classify(
-			promptAnalysis.command
-		);
+		const { confidence, intent } = (
+			await this.classifier.classify(promptAnalysis.command)
+		)[0];
 
 		console.info(confidence, intent);
 
