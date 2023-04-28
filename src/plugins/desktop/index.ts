@@ -34,7 +34,7 @@ export class DesktopContext extends AssistantContext {
 			.replaceAll('pm', 'pee em');
 
 		final = digitsToWords(final);
-		this.plugin.window.webContents.executeJavaScript(
+		this.plugin.window?.webContents.executeJavaScript(
 			`displayText("${data}",10000)`
 		);
 		this.plugin.tts?.sendAndWait(Buffer.from(final), 1);
@@ -68,17 +68,17 @@ export class DesktopContext extends AssistantContext {
 export default class DesktopPlugin extends AssistantPlugin {
 	tts: PythonProcess;
 	stt: PythonProcess;
-	window: BrowserWindow;
+	window?: BrowserWindow;
 	tempDir = '';
 
 	constructor() {
 		super();
 		this.tts = new PythonProcess('tts.py', [this.dataPath]);
 		this.stt = new PythonProcess('stt.py', [this.dataPath]);
-		this.window = new BrowserWindow({
-			show: true,
-			autoHideMenuBar: true,
-		});
+		// this.window = new BrowserWindow({
+		// 	show: true,
+		// 	autoHideMenuBar: true,
+		// });
 	}
 
 	pendingCallback: ((data: string) => void) | null = null;
@@ -91,7 +91,7 @@ export default class DesktopPlugin extends AssistantPlugin {
 		await this.stt.waitForState(ELoadableState.ACTIVE);
 		await this.tts.waitForState(ELoadableState.ACTIVE);
 
-		this.window.loadFile(path.join(this.dataPath, 'index.html'));
+		this.window?.loadFile(path.join(this.dataPath, 'index.html'));
 		//this.window.webContents.openDevTools();
 		this.stt.on('onPacket', (_, pack) => {
 			if (this.pendingCallback) {
@@ -100,7 +100,7 @@ export default class DesktopPlugin extends AssistantPlugin {
 				return;
 			}
 
-			bus.assistant.tryStartSkill(pack.toString(), new DesktopContext(this));
+			this.assistant.tryStartSkill(pack.toString(), new DesktopContext(this));
 		});
 
 		this.tempDir = path.join(this.dataPath, 'temp');

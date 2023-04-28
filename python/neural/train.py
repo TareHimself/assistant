@@ -9,7 +9,7 @@ from neural.utils import hash_intents, expand_all_examples, PYTORCH_DEVICE
 from tqdm import tqdm
 
 
-def train_intents(intents: list, save_path: str, batch_size=64, learning_rate=1E-3, epochs=350):
+def train_intents(intents: list, save_path: str, batch_size=64, learning_rate=4E-4, epochs=350):
     expand_all_examples(intents)
     intents_hash = hash_intents(intents)
     if path.exists(save_path):
@@ -48,8 +48,8 @@ def train_intents(intents: list, save_path: str, batch_size=64, learning_rate=1E
     train_loader = DataLoader(
         dataset=dataset, batch_size=batch_size, num_workers=0, shuffle=True)
 
-    embed_dim = 300
-    hidden_size = 128
+    embed_dim = 512
+    hidden_size = 256
     print("device" + PYTORCH_DEVICE.__str__())
     model = IntentsNeuralNet(dataset.words_vocab, embed_dim,
                              hidden_size, dataset.tags).to_device(PYTORCH_DEVICE)

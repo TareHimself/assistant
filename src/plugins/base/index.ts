@@ -5,7 +5,7 @@ import {
 	SkillInstance,
 } from '@core/assistant';
 import { IIntent } from '@core/types';
-import math = require('mathjs');
+const math = require('mathjs');
 import { delay, pad } from '@core/utils';
 import { digitsToWords, wordsToDigits } from '@core/conversion';
 import { PythonProcess } from '@core/subprocess';
@@ -54,17 +54,27 @@ class ArithmeticSkill extends AssistantSkill<ArithmeticSkillData> {
 		];
 	}
 
+	promptToExpression(prompt: string) {
+		return ArithmeticSkill.OPERATORS_KEYS.reduce((all, cur) => {
+			return all.replaceAll(cur, ArithmeticSkill.OPERATORS[cur]);
+		}, `${wordsToDigits(prompt)}`.toLowerCase())
+			.replaceAll(ArithmeticSkill.REMOVE_FROM_EXPRESSION, '')
+			.trim();
+	}
+
+	override shouldExecute(
+		intent: string,
+		source: AssistantContext,
+		prompt: string
+	): boolean {
+		return this.promptToExpression(prompt).length > 0;
+	}
+
 	override async dataExtractor(
 		instance: SkillInstance
 	): Promise<ArithmeticSkillData> {
-		const expression = ArithmeticSkill.OPERATORS_KEYS.reduce((all, cur) => {
-			return all.replaceAll(cur, ArithmeticSkill.OPERATORS[cur]);
-		}, `${wordsToDigits(instance.prompt)}`.toLowerCase());
-
 		return {
-			expression: expression
-				.replaceAll(ArithmeticSkill.REMOVE_FROM_EXPRESSION, '')
-				.trim(),
+			expression: this.promptToExpression(instance.prompt),
 		};
 	}
 

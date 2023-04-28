@@ -88,7 +88,7 @@ class SpotifyPlaySkill extends AssistantSkill<SpotifyPlayData> {
 	): boolean {
 		return (
 			prompt.match(this.extractionRegex) !== null &&
-			bus.assistant.getPlugin<SpotifyPlugin>(SPOTIFY_PLUGIN_ID) !== undefined
+			this.assistant.getPlugin<SpotifyPlugin>(SPOTIFY_PLUGIN_ID) !== undefined
 		);
 	}
 	override async dataExtractor(
@@ -107,7 +107,7 @@ class SpotifyPlaySkill extends AssistantSkill<SpotifyPlayData> {
 		instance: SkillInstance,
 		data: SpotifyPlayData
 	): Promise<void> {
-		const plugin = bus.assistant.getPlugin<SpotifyPlugin>(SPOTIFY_PLUGIN_ID);
+		const plugin = this.assistant.getPlugin<SpotifyPlugin>(SPOTIFY_PLUGIN_ID);
 		if (!plugin) return;
 
 		const searchData = await plugin.spotify.searchForSong(

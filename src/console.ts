@@ -128,7 +128,7 @@ export function customConsoleError(...args: any[]) {
 		'|',
 		filename,
 		'|',
-		...args.map((a) => (a.isAxiosError ? a.message : a))
+		...args
 	);
 
 	LOG_FILE_STREAM.write(

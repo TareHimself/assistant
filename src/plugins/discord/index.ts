@@ -1,6 +1,19 @@
-import { AssistantContext, AssistantPlugin } from '@core/assistant';
+import {
+	Assistant,
+	AssistantContext,
+	AssistantPlugin,
+	IntentClassifier,
+} from '@core/assistant';
+import { getInfo } from 'ytdl-core';
 import { Client, Message } from 'discord.js-selfbot-v13';
-
+import {
+	NoSubscriberBehavior,
+	createAudioPlayer,
+	createAudioResource,
+	joinVoiceChannel,
+} from '@discordjs/voice';
+import { compareTwoStrings } from 'string-similarity';
+import play from 'play-dl';
 export interface IDiscordMessageInfo {
 	message: Message;
 }
@@ -16,6 +29,15 @@ class DiscordContext extends AssistantContext {
 
 	override get id(): string {
 		return 'discord-io';
+	}
+
+	override get sessionId(): string {
+		return (
+			this.id +
+			(this.data.message.guild === null
+				? this.data.message.author.id
+				: `${this.data.message.guildId}-${this.data.message.channelId}-${this.data.message.author.id}`)
+		);
 	}
 
 	override getInput(prompt: string, timeout?: number): Promise<string> {
@@ -55,15 +77,19 @@ class DiscordContext extends AssistantContext {
 
 export default class DiscordPlugin extends AssistantPlugin {
 	client = new Client({});
-
 	pendingUserInputs: { [key: string]: (message: Message) => void } = {};
-
 	constructor() {
 		super();
 	}
 
+	async tryClassify(prompt: string) {}
+
 	override async onLoad(): Promise<void> {
-		this.client.on('messageCreate', (message) => {
+		// const { DiscordStreamClient } = await eval(
+		// 	`import('discord-stream-client')`
+		// );
+
+		this.client.on('messageCreate', async (message) => {
 			if (message.author.id === this.client.user?.id) {
 				return;
 			}
@@ -74,12 +100,54 @@ export default class DiscordPlugin extends AssistantPlugin {
 				return;
 			}
 
+			// const voiceChannel = message.member?.voice.channel;
+			// if (
+			// 	compareTwoStrings(message.content.toLowerCase(), 'join call') > 0.6 &&
+			// 	voiceChannel
+			// ) {
+			// 	const connection = joinVoiceChannel({
+			// 		channelId: voiceChannel.id,
+			// 		guildId: voiceChannel.guildId,
+			// 		selfDeaf: false,
+			// 		selfMute: false,
+			// 		adapterCreator: message.member.guild.voiceAdapterCreator,
+			// 		debug: true,
+			// 	});
+
+			// 	const streamUrl = 'https://www.youtube.com/watch?v=jfKfPfyJRdk';
+
+			// 	const stream = await play.stream(streamUrl);
+
+			// 	const resource = createAudioResource(stream.stream, {
+			// 		inputType: stream.type,
+			// 	});
+
+			// 	const player = createAudioPlayer({
+			// 		behaviors: {
+			// 			noSubscriber: NoSubscriberBehavior.Play,
+			// 		},
+			// 	});
+
+			// 	player.play(resource);
+
+			// 	connection.subscribe(player);
+
+			// 	return;
+			// }
+
+			console.info(message.reference);
+			const isVerified =
+				message.guildId === null ||
+				(message.reference !== null
+					? (await message.fetchReference()).author.id === this.client.user?.id
+					: false);
+
 			this.assistant.tryStartSkill(
 				message.content,
 				new DiscordContext(this, {
 					message: message,
 				}),
-				message.guildId === null
+				isVerified
 			);
 		});
 

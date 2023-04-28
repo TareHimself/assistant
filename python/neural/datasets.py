@@ -13,8 +13,8 @@ class IntentsDataset(Dataset):
         self.train_labels = []
         self.train_entities = []
         self.tokenizer = tokenizer
-        self.words_vocab = Vocabulary(initial={'#unk': 0})
-        self.entities_vocab = Vocabulary(initial={'O': 0})
+        self.words_vocab = Vocabulary()
+        self.entities_vocab = Vocabulary(initial={"#pad": 0, 'O': 1})
         count = []
         unbalanced = []
 
@@ -56,4 +56,4 @@ class IntentsDataset(Dataset):
         return len(self.train_examples)
 
     def __getitem__(self, idx):
-        return self.train_labels[idx], self.train_examples[idx],self.train_entities[idx]
+        return self.train_labels[idx], self.train_examples[idx], self.train_entities[idx]

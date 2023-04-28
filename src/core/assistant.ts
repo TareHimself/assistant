@@ -8,6 +8,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { compareTwoStrings } from 'string-similarity';
 import { app } from 'electron';
+import { ChatProcess } from './chat';
 
 /**
  * The base class for all assistant skills.
@@ -53,6 +54,10 @@ export class SkillInstance {
 	// the skill that was activated
 	skill: AssistantSkill<any>;
 
+	get assistant() {
+		return bus.assistant;
+	}
+
 	constructor(
 		context: AssistantContext,
 		prompt: string,
@@ -67,7 +72,7 @@ export class SkillInstance {
 	}
 
 	async run() {
-		bus.assistant.activeSkills.set(this.id, this);
+		this.assistant.activeSkills.set(this.id, this);
 		try {
 			const data = await this.skill.dataExtractor(this);
 			await this.skill.execute(this, data);
@@ -76,7 +81,7 @@ export class SkillInstance {
 			console.error(error);
 		}
 
-		bus.assistant.activeSkills.delete(this.id);
+		this.assistant.activeSkills.delete(this.id);
 	}
 }
 
@@ -118,15 +123,26 @@ export class Assistant extends Loadable {
 	classifier: IntentClassifier = new IntentClassifier(
 		path.join(this.dataPath, 'intents.pt')
 	);
-	chatProcess: PythonProcess = new PythonProcess('chat.py');
+
+	chat: ChatProcess = new ChatProcess();
+
 	currentSkills: Map<string, AssistantSkill[]> = new Map();
 	plugins: Map<string, AssistantPlugin> = new Map();
 	bIsDoingSkill: boolean = false;
-	intents: { [key: string]: string[] } = {};
+	intents: { [key: string]: string[] } = {
+		chat_mode_on: [
+			'switch to chat mode',
+			'chat mode on',
+			'lets have a chat',
+			'chat on',
+		],
+		chat_mode_off: ['chat mode off', 'turn off chat mode', 'chat off'],
+	};
 	trainTimer: ReturnType<typeof setTimeout> | null = null;
 	expectingCommandTimer: ReturnType<typeof setTimeout> | null = null;
 	activeSkills: Map<string, SkillInstance> = new Map();
 	pluginQueue: [AssistantPlugin, (ref: AssistantPlugin) => void][] = [];
+	bIsInChatMode: boolean = false;
 
 	get dataPath() {
 		return path.join(DATA_PATH, 'core');
@@ -192,7 +208,7 @@ export class Assistant extends Loadable {
 		await this.classifier.load();
 		console.info('Intent classifier loaded');
 		console.info('Loading chat process');
-		await this.chatProcess.waitForState(ELoadableState.ACTIVE);
+		await this.chat.load();
 		console.info('Chat process loaded');
 
 		console.info('Training Intents');
@@ -271,15 +287,6 @@ export class Assistant extends Loadable {
 		await Promise.all(skills.map((skill) => this.useSkill(skill)));
 		this.plugins.set(plugin.id, plugin);
 		callback(plugin);
-	}
-
-	async getChat(phrase: string): Promise<string> {
-		const [_, packet] = await this.chatProcess.sendAndWait(
-			Buffer.from(phrase),
-			0
-		);
-
-		return packet.toString();
 	}
 
 	async analyzePrompt(
@@ -362,6 +369,20 @@ export class Assistant extends Loadable {
 		console.info(confidence, intent);
 
 		if (confidence > Assistant.SKILL_START_CONFIDENCE) {
+			if (intent === 'chat_mode_on' || intent === 'chat_mode_off') {
+				if (intent === 'chat_mode_on' && !this.bIsInChatMode) {
+					this.bIsInChatMode = true;
+					context.reply('Chat mode on.');
+					return;
+				} else if (this.bIsInChatMode) {
+					this.bIsInChatMode = false;
+					context.reply('Chat mode off.');
+					return;
+				}
+			}
+		}
+
+		if (!this.bIsInChatMode && confidence > Assistant.SKILL_START_CONFIDENCE) {
 			const skills = this.currentSkills.get(intent);
 
 			if (!skills) {
@@ -398,20 +419,10 @@ export class Assistant extends Loadable {
 		}
 
 		try {
-			const response = await this.getChat(promptAnalysis.command);
-			// const searchResponse = (
-			// 	await GoogleSearch.get<GoogleSearchResponse<string>>(
-			// 		`/search?${new URLSearchParams({
-			// 			s: promptAnalysis.command,
-			// 		}).toString()}`
-			// 	)
-			// ).data;
-
-			// if (!searchResponse.error) {
-			// 	context.reply(searchResponse.result);
-			// 	return [];
-			// }
-
+			const response = await this.chat.getResponse(
+				context.sessionId,
+				promptAnalysis.command
+			);
 			if (response.length) {
 				context.reply(response);
 				return [];
@@ -430,8 +441,6 @@ export class Assistant extends Loadable {
  * Acts as a bridge between the assistant and IO, allows the assistant to recieve prompts from external sources and reply to said sources
  */
 export abstract class AssistantContext extends LoadableWithId {
-	assistant: Assistant;
-
 	// the id of this contexts session i.e. the user id combined with the context id to reference who this context is communicating with
 	get sessionId() {
 		return this.id + uuidv4();
@@ -439,7 +448,6 @@ export abstract class AssistantContext extends LoadableWithId {
 
 	constructor() {
 		super();
-		this.assistant = bus.assistant;
 	}
 
 	async getInput(
@@ -460,11 +468,8 @@ export abstract class AssistantContext extends LoadableWithId {
 
 // The base class for plugins which can be anything that needs to register skills or intents
 export abstract class AssistantPlugin extends LoadableWithId {
-	assistant: Assistant;
-
 	constructor() {
 		super();
-		this.assistant = bus.assistant;
 	}
 
 	get dataPath() {

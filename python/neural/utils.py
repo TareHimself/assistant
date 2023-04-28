@@ -12,11 +12,10 @@ EXTRACT_VARIATIONS_REGEX = r"\[(.*?)\]"
 
 
 class Vocabulary:
-    def __init__(self, initial={'<unk>': 0}, unknown_index=0) -> None:
+    def __init__(self, initial={'#pad': 0, '#unk': 1}) -> None:
 
         self.last_new_index = max(initial.values()) + 1
         self.vocab = initial
-        self.unknown_index = unknown_index
 
     def add(self, items: list[str]):
 
@@ -29,11 +28,11 @@ class Vocabulary:
         return len(self.vocab.keys())
 
     def index(self, item: str) -> int:
-        return self.vocab.get(item, self.unknown_index,)
+        return self.vocab.get(item, 1)
 
     def __call__(self, words: list, length: int) -> list[int]:
         words_length = len(words)
-        return [self.index(words[x]) if x < words_length else self.unknown_index for x in range(length)]
+        return [self.index(words[x]) if x < words_length else 0 for x in range(length)]
 
 
 def split_text(text: str):

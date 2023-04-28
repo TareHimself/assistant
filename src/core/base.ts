@@ -43,6 +43,10 @@ export abstract class Loadable extends EventEmitter {
 		return this._state;
 	}
 
+	get assistant() {
+		return bus.assistant;
+	}
+
 	// Events added will be automatically unbound once this class is destroyed
 	addBoundEvent(
 		target: BoundEventTarget,
