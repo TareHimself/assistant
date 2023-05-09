@@ -1,7 +1,17 @@
-import { ELoadableState, Loadable, LoadableWithId } from './base';
+import {
+	AssistantObject,
+	ELoadableState,
+	Loadable,
+	LoadableWithId,
+} from './base';
 import { DATA_PATH, PLUGINS_PATH } from './paths';
 import { PythonProcess } from './subprocess';
-import { IClassificationResult, IIntent, IPromptAnalysisResult } from './types';
+import {
+	Awaitable,
+	IClassificationResult,
+	IIntent,
+	IPromptAnalysisResult,
+} from './types';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import path from 'path';
@@ -42,7 +52,7 @@ export abstract class AssistantSkill<T = unknown> extends Loadable {
 /**
  * Represents a skill that is currently being executed
  */
-export class SkillInstance {
+export class SkillInstance extends AssistantObject {
 	// the id of this instance
 	id: string;
 	// the context that this instance was created from
@@ -54,16 +64,13 @@ export class SkillInstance {
 	// the skill that was activated
 	skill: AssistantSkill<any>;
 
-	get assistant() {
-		return bus.assistant;
-	}
-
 	constructor(
 		context: AssistantContext,
 		prompt: string,
 		intent: string,
 		skill: AssistantSkill<any>
 	) {
+		super();
 		this.id = uuidv4().replaceAll('-', '');
 		this.context = context;
 		this.prompt = prompt;
@@ -80,7 +87,7 @@ export class SkillInstance {
 			this.context.reply(`There was an error [${error.message}]`);
 			console.error(error);
 		}
-
+		this.assistant.emit('onSkillDeactivate', this.id);
 		this.assistant.activeSkills.delete(this.id);
 	}
 }
@@ -116,10 +123,42 @@ export class IntentClassifier extends Loadable {
 		return dataRecieved;
 	}
 }
+
+export interface IAssistantEvents {
+	onReady: [assistant: Assistant];
+	onSkillActivate: [instanceId: string];
+	onSkillDeactivate: [instanceId: string];
+	onPluginAdded: [pluginId: string];
+	onPluginReloaded: [pluginId: string];
+	onPluginRemoved: [pluginId: string];
+	onExpectingCommandStart: [];
+	onExpectingCommandStop: [];
+}
+
 /**
  * The assistant
  */
 export class Assistant extends Loadable {
+	on!: <T extends keyof IAssistantEvents>(
+		eventName: T,
+		listener: (...args: IAssistantEvents[T]) => Awaitable<void>
+	) => this;
+
+	once!: <T extends keyof IAssistantEvents>(
+		eventName: T,
+		listener: (...args: IAssistantEvents[T]) => Awaitable<void>
+	) => this;
+
+	off!: <T extends keyof IAssistantEvents>(
+		eventName: T,
+		listener: (...args: IAssistantEvents[T]) => Awaitable<void>
+	) => this;
+
+	emit!: <T extends keyof IAssistantEvents>(
+		eventName: T,
+		...args: IAssistantEvents[T]
+	) => boolean;
+
 	classifier: IntentClassifier = new IntentClassifier(
 		path.join(this.dataPath, 'intents.pt')
 	);
@@ -138,6 +177,7 @@ export class Assistant extends Loadable {
 		],
 		chat_mode_off: ['chat mode off', 'turn off chat mode', 'chat off'],
 	};
+
 	trainTimer: ReturnType<typeof setTimeout> | null = null;
 	expectingCommandTimer: ReturnType<typeof setTimeout> | null = null;
 	activeSkills: Map<string, SkillInstance> = new Map();
@@ -157,6 +197,9 @@ export class Assistant extends Loadable {
 	static EXPECTING_COMMAND_TIMER = 1000 * 20;
 	constructor() {
 		super();
+		this.waitForState(ELoadableState.ACTIVE).then(() => {
+			this.emit('onReady', this);
+		});
 		console.info('Loading assistant');
 		this.load();
 	}
@@ -287,6 +330,7 @@ export class Assistant extends Loadable {
 		await Promise.all(skills.map((skill) => this.useSkill(skill)));
 		this.plugins.set(plugin.id, plugin);
 		callback(plugin);
+		this.emit('onPluginAdded', plugin.id);
 	}
 
 	async analyzePrompt(
@@ -323,6 +367,7 @@ export class Assistant extends Loadable {
 			clearTimeout(this.expectingCommandTimer);
 			this.expectingCommandTimer = null;
 		}
+		this.emit('onExpectingCommandStop');
 	}
 
 	startExpecting() {
@@ -334,6 +379,7 @@ export class Assistant extends Loadable {
 			this.stopExpecting();
 			console.info('Timed out waiting for command');
 		}, Assistant.EXPECTING_COMMAND_TIMER);
+		this.emit('onExpectingCommandStart');
 	}
 
 	async tryStartSkill(
@@ -408,7 +454,7 @@ export class Assistant extends Loadable {
 				);
 
 				skillInstance.run();
-
+				this.emit('onSkillActivate', skillInstance.id);
 				return skillInstance.id;
 			});
 

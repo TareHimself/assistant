@@ -219,7 +219,7 @@ class SpotifyApi extends Loadable {
 			);
 			setTimeout(
 				this.refreshToken.bind(this),
-				Date.now() - this.auth.refresh_at
+				this.auth.refresh_at - Date.now()
 			);
 		} catch (error) {
 			console.error(error);
@@ -262,7 +262,7 @@ class SpotifyApi extends Loadable {
 
 			setTimeout(
 				this.refreshToken.bind(this),
-				Date.now() - this.auth.refresh_at
+				this.auth.refresh_at - Date.now()
 			);
 		} catch (error) {
 			console.error(error);

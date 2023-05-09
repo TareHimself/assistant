@@ -7,7 +7,7 @@ import {
 import { IIntent } from '@core/types';
 const math = require('mathjs');
 import { delay, pad } from '@core/utils';
-import { digitsToWords, wordsToDigits } from '@core/conversion';
+import { wordsToDigits } from '@core/conversion';
 import { PythonProcess } from '@core/subprocess';
 import { compareTwoStrings } from 'string-similarity';
 import { ELoadableState } from '@core/base';
@@ -299,65 +299,6 @@ class TimeSkill extends AssistantSkill<null> {
 	}
 }
 
-export interface ISpeakSkillData {
-	phrase: string;
-}
-
-class SpeakSkill extends AssistantSkill<ISpeakSkillData> {
-	extractionRegexp = new RegExp(/(?:(?:say|speak|repeat)\s?)(.*)/, 'i');
-	override get intents(): IIntent[] {
-		return [
-			{
-				tag: 'skill_self_say',
-				examples: [
-					'say wakanda forever',
-					'[say | speak] [what time is it | what is the time | remind me to do something | italian baby]',
-					'[say | speak] [sea shells and shit | can i put this in your mouth | when can i become human]',
-					'[say | speak] The red van was pulling a trailer with a beat-up lawn mower on it',
-					'[say | speak] Everything has a beginning and an end',
-					'[say | speak] We can go to the oark',
-					"[say | speak] I don't like the polluted atmosphere of big cities",
-					'[say | speak] She constantly thought she was one mistake away from being fired',
-					"[say | speak] It's the biggest sports shop in the region",
-					'[say | speak] My home is bright pink and has yellow flowers growing all around it',
-					'[say | speak] I’m a hundred percent certain that it is going to rain later today',
-					'[say | speak] Sit down and shut up',
-					'[say | speak] I brought home the trophy',
-					'[say | speak] Business costs will go down',
-					'[say | speak] I need to go home',
-					'[say | speak] A list of required hardware is available here',
-					'[say | speak] The bigger boys torment the little ones',
-					'[say | speak] I miss my girlfriend',
-					'[say | speak] Workers will not be empowered',
-					'[say | speak] He’s as proud as a peacock',
-					'[say | speak] Tom made a big donation to the hospital',
-					'[say | speak] He has a nice sum of money put away',
-					'[say | speak] We should be able to resolve our differences',
-				],
-			},
-		];
-	}
-
-	override shouldExecute(
-		intent: string,
-		source: AssistantContext,
-		prompt: string
-	): boolean {
-		return this.extractionRegexp.test(prompt);
-	}
-
-	override async dataExtractor(instance: SkillInstance) {
-		const [_, toSpeak] = instance.prompt.match(this.extractionRegexp)!;
-		return {
-			phrase: toSpeak,
-		};
-	}
-
-	override async execute(instance: SkillInstance, data: ISpeakSkillData) {
-		instance.context.reply(data.phrase);
-	}
-}
-
 export default class BasePlugin extends AssistantPlugin {
 	override get id(): string {
 		return 'base-plugin';
@@ -368,7 +309,6 @@ export default class BasePlugin extends AssistantPlugin {
 			new ArithmeticSkill(),
 			new TimeSkill(),
 			new ScheduleSkill(),
-			new SpeakSkill(),
 			new GenerateImageSkill(),
 			new (class PromptTest extends AssistantSkill<null> {
 				get intents() {

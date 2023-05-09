@@ -129,14 +129,14 @@ class Bridge:
         self.callbacks.append(callback)
 
 
-CHANNELS = 1
-DEFAULT_INPUT_DEVICE = None  # 4
-DEFAULT_SAMPLE_RATE = 16000
-MAIN_STREAM_BLOCK_SIZE = 8000
-FORMAT = pyaudio.paInt16
-
-
 class AudioStream(Thread):
+
+    CHANNELS = 1
+    DEFAULT_INPUT_DEVICE = None  # 4
+    DEFAULT_SAMPLE_RATE = 16000
+    MAIN_STREAM_BLOCK_SIZE = 8000
+    FORMAT = pyaudio.paInt16
+
     def __init__(self, callback, chunk=None, device=DEFAULT_INPUT_DEVICE, samplerate=DEFAULT_SAMPLE_RATE):
         super().__init__(daemon=True, group=None)
         self.chunk = chunk
@@ -154,8 +154,8 @@ class AudioStream(Thread):
                 self.samplerate * FRAME_DURATION / 1000)
 
             stream = audio.open(input_device_index=self.device,
-                                format=FORMAT,
-                                channels=CHANNELS,
+                                format=AudioStream.FORMAT,
+                                channels=AudioStream.CHANNELS,
                                 rate=self.samplerate,
                                 input=True,
                                 frames_per_buffer=CHUNK)

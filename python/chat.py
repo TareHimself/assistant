@@ -5,7 +5,9 @@ import asyncio
 from random import choice
 from transformers import pipeline
 
-generator = pipeline('text-generation', model='PygmalionAI/pygmalion-1.3b')
+generator = pipeline(
+    "text-generation", model="PygmalionAI/pygmalion-1.3b", device=0  # "cpu"
+)
 
 persona = """Alice's Persona: An assistant built with NodeJS.
 <START>
@@ -17,9 +19,10 @@ def generate(content: str) -> str:
 
     prompt = persona + content + "\nAlice:"
     #
-    generated = generator(prompt, max_length=len(
-        prompt) + 15, num_return_sequences=1)[0]['generated_text']
-    return generated[len(prompt):len(generated)].split('\n')[0].strip()
+    generated = generator(prompt, max_length=len(prompt) + 15, num_return_sequences=1)[
+        0
+    ]["generated_text"]
+    return generated[len(prompt) : len(generated)].split("\n")[0].strip()
 
 
 process_bridge = Bridge()

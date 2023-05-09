@@ -3,6 +3,7 @@
   "version": "1.5.0",
   "description": "A voice assistant",
   "main": "./dist/index.js",
+  "module": "./dist/main.js",
   "scripts": {
     "start": "electron --unhandled-rejections=strict ./dist/index.js",
     "build": "npm run clean && npx tsc",
@@ -29,6 +30,7 @@
     "discord.js": "^14.9.0",
     "discord.js-selfbot-v13": "^2.13.5",
     "electron-squirrel-startup": "^1.0.0",
+    "esm": "^3.2.25",
     "express": "^4.17.1",
     "express-websocket-proxy": "^1.6.2",
     "ffmpeg": "^0.0.4",

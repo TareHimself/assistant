@@ -135,7 +135,6 @@ export default class DiscordPlugin extends AssistantPlugin {
 			// 	return;
 			// }
 
-			console.info(message.reference);
 			const isVerified =
 				message.guildId === null ||
 				(message.reference !== null

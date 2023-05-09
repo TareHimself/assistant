@@ -1,6 +1,8 @@
-
-
-from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler, AutoencoderKL
+from diffusers import (
+    StableDiffusionPipeline,
+    DPMSolverMultistepScheduler,
+    AutoencoderKL,
+)
 import torch
 import io
 from sys import argv
@@ -16,15 +18,19 @@ main_process = Bridge()
 
 model_pastel = "TareHimself/pastelmix-better-vae"
 scheduler = DPMSolverMultistepScheduler.from_pretrained(
-    model_pastel, subfolder="scheduler")
+    model_pastel, subfolder="scheduler"
+)
 pipeline_pastel = StableDiffusionPipeline.from_pretrained(
-    model_pastel, scheduler=scheduler, torch_dtype=torch.float16)
+    model_pastel, scheduler=scheduler, torch_dtype=torch.float16
+)
 
 model_anything = "TareHimself/anything-v4.0"
 scheduler = DPMSolverMultistepScheduler.from_pretrained(
-    model_anything, subfolder="scheduler")
+    model_anything, subfolder="scheduler"
+)
 pipeline_anything = StableDiffusionPipeline.from_pretrained(
-    model_anything, scheduler=scheduler,  torch_dtype=torch.float16)
+    model_anything, scheduler=scheduler, torch_dtype=torch.float16
+)
 
 pipeline_pastel = pipeline_pastel.to("cuda")
 pipeline_anything = pipeline_anything.to("cuda")
@@ -37,13 +43,19 @@ def on_packet(op, packet: bytes):
 
     pipeline_to_use = pipeline_pastel if op == 1 else pipeline_anything
 
-    prompt = packet.decode('utf-8')
-    debug(b'Generating')
-    image = pipeline_to_use(prompt,
-                            negative_prompt=NEGATIVE_PROMPT, num_inference_steps=60, height=8 * 64, width=8 * 64, guidance_scale=7).images[0]
-    debug(b'Done Generating')
+    prompt = packet.decode("utf-8")
+    debug(b"Generating")
+    image = pipeline_to_use(
+        prompt,
+        negative_prompt=NEGATIVE_PROMPT,
+        num_inference_steps=50,
+        height=8 * 40,
+        width=8 * 40,
+        guidance_scale=7,
+    ).images[0]
+    debug(b"Done Generating")
     output = io.BytesIO()
-    image.save(output, format='PNG')
+    image.save(output, format="PNG")
 
     bytesToSend = output.getvalue()
 

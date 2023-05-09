@@ -4,6 +4,11 @@ import { BoundEvent, BoundEventCallback, BoundEventTarget } from './types';
 
 export type NoParamCallback = () => void | Promise<void>;
 
+export abstract class AssistantObject extends EventEmitter {
+	get assistant() {
+		return bus.assistant;
+	}
+}
 export const enum ELoadableState {
 	INACTIVE = 'Inactive',
 	ACTIVE = 'Active',
@@ -11,7 +16,7 @@ export const enum ELoadableState {
 	DESTROYING = 'Destroying',
 }
 
-export abstract class Loadable extends EventEmitter {
+export abstract class Loadable extends AssistantObject {
 	events: BoundEvent[] = [];
 	private _state: ELoadableState = ELoadableState.INACTIVE;
 	_stateCallbacks: Map<ELoadableState, NoParamCallback[]> = new Map();
@@ -41,10 +46,6 @@ export abstract class Loadable extends EventEmitter {
 
 	get state() {
 		return this._state;
-	}
-
-	get assistant() {
-		return bus.assistant;
 	}
 
 	// Events added will be automatically unbound once this class is destroyed
