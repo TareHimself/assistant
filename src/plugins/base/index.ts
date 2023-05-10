@@ -309,7 +309,7 @@ export default class BasePlugin extends AssistantPlugin {
 			new ArithmeticSkill(),
 			new TimeSkill(),
 			new ScheduleSkill(),
-			new GenerateImageSkill(),
+			//new GenerateImageSkill(),
 			new (class PromptTest extends AssistantSkill<null> {
 				get intents() {
 					return [

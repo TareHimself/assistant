@@ -133,3 +133,32 @@ export abstract class LoadableWithId extends Loadable {
 		return '';
 	}
 }
+
+export class Singleton extends AssistantObject {
+	static singletons: Map<string, Singleton> = new Map();
+
+	get id() {
+		throw new Error(`Cannot use class "Singleton" without and id`);
+		return '';
+	}
+
+	onInitialized() {}
+	/**
+	 * All classes must implement this
+	 * @returns
+	 */
+	static get() {
+		const newItem = new Singleton();
+		return this.registerSingleton(new Singleton());
+	}
+
+	static registerSingleton<T extends Singleton>(s: T) {
+		Singleton.singletons.set(s.id, s);
+		s.onInitialized();
+		return s;
+	}
+
+	static getSingleton<T>(id: string) {
+		return Singleton.singletons.get(id) as T | undefined;
+	}
+}

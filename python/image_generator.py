@@ -11,7 +11,7 @@ import torch
 import sounddevice as sd
 from os import path
 from bridge import Bridge, debug
-
+from neural.utils import PYTORCH_DEVICE
 
 main_process = Bridge()
 
@@ -32,8 +32,8 @@ pipeline_anything = StableDiffusionPipeline.from_pretrained(
     model_anything, scheduler=scheduler, torch_dtype=torch.float16
 )
 
-pipeline_pastel = pipeline_pastel.to("cuda")
-pipeline_anything = pipeline_anything.to("cuda")
+pipeline_pastel = pipeline_pastel.to(PYTORCH_DEVICE)
+pipeline_anything = pipeline_anything.to(PYTORCH_DEVICE)
 NEGATIVE_PROMPT = "lowres, ((bad anatomy)), ((bad hands)), text, missing finger, extra digits, fewer digits, blurry, ((mutated hands and fingers)), (poorly drawn face), ((mutation)), ((deformed face)), (ugly), ((bad proportions)), ((extra limbs)), extra face, (double head), (extra head), ((extra feet)), monster, logo, cropped, worst quality, low quality, normal quality, jpeg, humpbacked, long body, long neck, ((jpeg artifacts)), EasyNegative"
 
 

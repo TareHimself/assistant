@@ -10,14 +10,18 @@ import io
 from sys import argv
 
 generator = torch.manual_seed(2203084815)
-model_id = "anything-v4.0"
-scheduler = DPMSolverMultistepScheduler.from_pretrained(model_id, subfolder="scheduler")
-pipeline = StableDiffusionPipeline.from_pretrained(
-    model_id, scheduler=scheduler, torch_dtype=torch.float16
+model_id = "TareHimself/pastelmix-better-vae"
+print("Loading files")
+scheduler = DPMSolverMultistepScheduler.from_pretrained(
+    model_id, subfolder="scheduler", local_files_only=True
 )
+pipeline = StableDiffusionPipeline.from_pretrained(
+    model_id, scheduler=scheduler, torch_dtype=torch.float16, local_files_only=True
+)
+print("FIles loaded")
 # pipeline.scheduler = DPMSolverMultistepScheduler.from_config(
 #     pipeline.scheduler.config)
-pipeline.to("cuda")
+pipeline.to(torch.device("mps"))
 
 
 NEGATIVE_PROMPT = "lowres, ((bad anatomy)), ((bad hands)), text, missing finger, extra digits, fewer digits, blurry, ((mutated hands and fingers)), (poorly drawn face), ((mutation)), ((deformed face)), (ugly), ((bad proportions)), ((extra limbs)), extra face, (double head), (extra head), ((extra feet)), monster, logo, cropped, worst quality, low quality, normal quality, jpeg, humpbacked, long body, long neck, ((jpeg artifacts))"

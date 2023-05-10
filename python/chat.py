@@ -4,9 +4,12 @@ import sys
 import asyncio
 from random import choice
 from transformers import pipeline
+from neural.utils import PYTORCH_DEVICE
 
 generator = pipeline(
-    "text-generation", model="PygmalionAI/pygmalion-1.3b", device=0  # "cpu"
+    "text-generation",
+    model="PygmalionAI/pygmalion-1.3b",
+    device=PYTORCH_DEVICE,  # "cpu"
 )
 
 persona = """Alice's Persona: An assistant built with NodeJS.

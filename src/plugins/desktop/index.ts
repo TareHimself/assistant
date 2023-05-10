@@ -74,7 +74,7 @@ export default class DesktopPlugin extends AssistantPlugin {
 	constructor() {
 		super();
 		this.tts = new PythonProcess('tts.py', [this.dataPath]);
-		this.stt = new PythonProcess('stt.py', [this.dataPath]);
+		this.stt = new PythonProcess('empty.py', [this.dataPath]);
 		// this.window = new BrowserWindow({
 		// 	show: true,
 		// 	autoHideMenuBar: true,

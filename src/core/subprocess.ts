@@ -161,6 +161,7 @@ export class SubProcess extends Loadable {
 		this.on('onPacket', (op) => {
 			if (this.state !== ELoadableState.ACTIVE && op === -1) {
 				this.load();
+				console.log('PROCESS READY', this.filePath);
 			}
 		});
 	}
