@@ -1,9 +1,4 @@
-import {
-	Assistant,
-	AssistantContext,
-	AssistantPlugin,
-	IntentClassifier,
-} from '@core/assistant';
+import { Assistant, AssistantContext, AssistantPlugin } from '@core/assistant';
 import { getInfo } from 'ytdl-core';
 import { Client, Message } from 'discord.js-selfbot-v13';
 import {

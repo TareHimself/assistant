@@ -10,7 +10,7 @@ import { v4 } from 'uuid';
 import { BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import path from 'path';
-import { IIntent } from '@core/types';
+import { IIntent, IParsedEntity } from '@core/types';
 import axios from 'axios';
 const SPOTIFY_PLUGIN_ID = 'spotify-plugin';
 
@@ -62,12 +62,20 @@ export interface SpotifySearchResponse {
 	>;
 }
 
-class SpotifyPlaySkill extends AssistantSkill<SpotifyPlayData> {
+class SpotifyPlaySkill extends AssistantSkill {
 	extractionRegex = new RegExp(/(?:play)\s(?:(track|playlist|album)\s)?(.*)/);
 	get intents(): IIntent[] {
 		return [
 			{
-				tag: 'skill_spotify_play',
+				tag: 's_s_play',
+				description: 'plays music',
+				entities: [
+					{
+						tag: 'track',
+						description: 'what to play',
+						extractor: (p) => p.split(' ').slice(1).join(' '),
+					},
+				],
 				examples: [
 					'play in the name of love',
 					'play girls on boys',
@@ -81,39 +89,22 @@ class SpotifyPlaySkill extends AssistantSkill<SpotifyPlayData> {
 		];
 	}
 
-	override shouldExecute(
-		intent: string,
-		source: AssistantContext,
-		prompt: string
-	): boolean {
+	override shouldExecute(instance: SkillInstance): boolean {
 		return (
-			prompt.match(this.extractionRegex) !== null &&
-			this.assistant.getPlugin<SpotifyPlugin>(SPOTIFY_PLUGIN_ID) !== undefined
+			this.assistant.getPlugin<SpotifyPlugin>(SPOTIFY_PLUGIN_ID) !==
+				undefined &&
+			instance.entities.find((e) => e.entity === 'track') !== undefined
 		);
 	}
-	override async dataExtractor(
-		instance: SkillInstance
-	): Promise<SpotifyPlayData> {
-		const [_, type, query] = instance.prompt.match(this.extractionRegex)!;
-		return {
-			type:
-				((type || '').toLowerCase() as SpotifyPlayData['type'] | undefined) ||
-				'none',
-			query: query,
-		};
-	}
 
-	override async execute(
-		instance: SkillInstance,
-		data: SpotifyPlayData
-	): Promise<void> {
+	override async execute(instance: SkillInstance): Promise<void> {
 		const plugin = this.assistant.getPlugin<SpotifyPlugin>(SPOTIFY_PLUGIN_ID);
 		if (!plugin) return;
 
-		const searchData = await plugin.spotify.searchForSong(
-			data.query,
-			data.type
-		);
+		const query =
+			instance.entities.find((e) => e.entity === 'track')?.data || '';
+
+		const searchData = await plugin.spotify.searchForSong(query, 'track');
 
 		await plugin.spotify.playTrackUris([searchData['tracks']['items'][0].uri]);
 		console.info('Track Search Data');
@@ -331,7 +322,7 @@ export default class SpotifyPlugin extends AssistantPlugin {
 		await this.spotify.load();
 	}
 
-	override async getSkills(): Promise<AssistantSkill<any>[]> {
+	override async getSkills(): Promise<AssistantSkill[]> {
 		return [new SpotifyPlaySkill()];
 	}
 }

@@ -1,5 +1,6 @@
 import './resolver'; // top level import for module resolution help
 import './console';
+import fs from 'fs';
 /**
  * Gets a random item from the array
  */
@@ -19,6 +20,9 @@ app.on('window-all-closed', () => {});
 global.bus = {
 	assistant: new Assistant(),
 };
+// fs.promises.readFile('test.jpg').then((file) => {
+// 	FilesApi.get().upload('testfile.jpg', file).then(console.log);
+// });
 
 // SendNotification({ app: "Alice (Assistant)", image: `D:\\Github\\voice\\assets\\icon.png`, title: "Kirei", content: "Where Is You?" })
 

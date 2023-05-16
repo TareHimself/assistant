@@ -17,8 +17,6 @@ export const GoogleSearch = axios.create({
 	baseURL: 'https://proxy.oyintare.dev/gsearch/',
 });
 
-export class FilesApi extends 
-
 // export {
 //     DatabaseApi,
 //     ServerApi

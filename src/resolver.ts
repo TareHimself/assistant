@@ -16,7 +16,9 @@ const tsConfig = JSON.parse(
 const BASE_URL = tsConfig['compilerOptions']['outDir'];
 const PATHS: string[] = [];
 const PATH_DICT: { [key: string]: string } = {};
-Object.keys(tsConfig['compilerOptions']['paths']).forEach((p) => {
+Object.keys(
+	tsConfig['compilerOptions']['paths'] as Record<string, string>
+).forEach((p) => {
 	const key = p.slice(0, -2);
 	PATHS.push(key);
 	PATH_DICT[key] = path.join(

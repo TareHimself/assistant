@@ -10,6 +10,7 @@ import {
 	Awaitable,
 	IClassificationResult,
 	IIntent,
+	IParsedEntity,
 	IPromptAnalysisResult,
 } from './types';
 import * as fs from 'fs/promises';
@@ -19,11 +20,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { compareTwoStrings } from 'string-similarity';
 import { app } from 'electron';
 import { ChatProcess } from './chat';
+import { IntentClassifier, SimpleIntentClassifier } from './classifiers';
 
 /**
  * The base class for all assistant skills.
  */
-export abstract class AssistantSkill<T = unknown> extends Loadable {
+export abstract class AssistantSkill extends Loadable {
 	constructor() {
 		super();
 	}
@@ -32,19 +34,11 @@ export abstract class AssistantSkill<T = unknown> extends Loadable {
 		return [];
 	}
 
-	async dataExtractor(instance: SkillInstance): Promise<T> {
-		throw new Error('Data extractor not implemented');
-	}
-
-	shouldExecute(
-		intent: string,
-		source: AssistantContext,
-		prompt: string
-	): boolean {
+	shouldExecute(instance: SkillInstance): boolean {
 		return true;
 	}
 
-	async execute(instance: SkillInstance, data: T) {
+	async execute(instance: SkillInstance) {
 		instance.context.reply('This skill has not yet been implemented.');
 	}
 }
@@ -62,65 +56,41 @@ export class SkillInstance extends AssistantObject {
 	// the intent that caused the activation of this skill
 	intent: string;
 	// the skill that was activated
-	skill: AssistantSkill<any>;
+	skill: AssistantSkill;
+
+	entities: IParsedEntity[];
 
 	constructor(
 		context: AssistantContext,
 		prompt: string,
 		intent: string,
-		skill: AssistantSkill<any>
+		entities: IParsedEntity[],
+		skill: AssistantSkill
 	) {
 		super();
 		this.id = uuidv4().replaceAll('-', '');
 		this.context = context;
 		this.prompt = prompt;
 		this.intent = intent;
+		this.entities = entities;
 		this.skill = skill;
 	}
 
 	async run() {
-		this.assistant.activeSkills.set(this.id, this);
 		try {
-			const data = await this.skill.dataExtractor(this);
-			await this.skill.execute(this, data);
+			this.assistant.emit('onSkillActivate', this.id);
+			this.assistant.activeSkills.set(this.id, this);
+			await this.skill.execute(this);
 		} catch (error: any) {
 			this.context.reply(`There was an error [${error.message}]`);
-			console.error(error);
+			console.error(
+				'Error while executing skill.',
+				`Instance Id [${this.id}]\n`,
+				error
+			);
 		}
 		this.assistant.emit('onSkillDeactivate', this.id);
 		this.assistant.activeSkills.delete(this.id);
-	}
-}
-
-export class IntentClassifier extends Loadable {
-	process = new PythonProcess('intents.py');
-	savePath: string;
-	constructor(savePath: string) {
-		super();
-		this.savePath = savePath;
-	}
-
-	override async onLoad(): Promise<void> {
-		await this.process.waitForState(ELoadableState.ACTIVE);
-	}
-
-	async train(intents: IIntent[]) {
-		await this.process.sendAndWait(
-			Buffer.from(
-				JSON.stringify({
-					tags: intents,
-					model: this.savePath,
-				})
-			),
-			2
-		);
-	}
-
-	async classify(text: string): Promise<IClassificationResult[]> {
-		const [_, nluPacket] = await this.process.sendAndWait(Buffer.from(text), 1);
-		const dataRecieved = JSON.parse(nluPacket.toString());
-		console.log(dataRecieved);
-		return dataRecieved;
 	}
 }
 
@@ -159,30 +129,24 @@ export class Assistant extends Loadable {
 		...args: IAssistantEvents[T]
 	) => boolean;
 
-	classifier: IntentClassifier = new IntentClassifier(
-		path.join(this.dataPath, 'intents.pt')
-	);
+	// classifier: IntentClassifier = new IntentClassifier(
+	// 	path.join(this.dataPath, 'intents.pt')
+	// );
 
-	chat: ChatProcess = new ChatProcess();
+	// chat: ChatProcess = new ChatProcess();
 
 	currentSkills: Map<string, AssistantSkill[]> = new Map();
 	plugins: Map<string, AssistantPlugin> = new Map();
 	bIsDoingSkill: boolean = false;
-	intents: { [key: string]: string[] } = {
-		chat_mode_on: [
-			'switch to chat mode',
-			'chat mode on',
-			'lets have a chat',
-			'chat on',
-		],
-		chat_mode_off: ['chat mode off', 'turn off chat mode', 'chat off'],
-	};
-
+	intents: { [key: string]: IIntent } = {};
 	trainTimer: ReturnType<typeof setTimeout> | null = null;
 	expectingCommandTimer: ReturnType<typeof setTimeout> | null = null;
 	activeSkills: Map<string, SkillInstance> = new Map();
 	pluginQueue: [AssistantPlugin, (ref: AssistantPlugin) => void][] = [];
 	bIsInChatMode: boolean = false;
+	classifier: IntentClassifier = new SimpleIntentClassifier(
+		path.join(this.dataPath, 'intents.pt')
+	);
 
 	get dataPath() {
 		return path.join(DATA_PATH, 'core');
@@ -250,29 +214,29 @@ export class Assistant extends Loadable {
 		console.info('Loading Intent classifier');
 		await this.classifier.load();
 		console.info('Intent classifier loaded');
-		console.info('Loading chat process');
-		await this.chat.load();
-		console.info('Chat process loaded');
+		console.info('Training Intent classifier');
+		await this.classifier.train(Object.values(this.intents));
+		console.info('Intent classifier trained');
+		// console.info('Loading chat process');
+		// await this.chat.load();
+		// console.info('Chat process loaded');
 
-		console.info('Training Intents');
+		// console.info('Training Intents');
 
-		const intentsToTrain = Object.keys(this.intents).reduce<IIntent[]>(
-			(all, intent) => {
-				all.push({
-					tag: intent,
-					examples: this.intents[intent],
-				});
+		// const intentsToTrain = Object.keys(this.intents).reduce<IIntent[]>(
+		// 	(all, intent) => {
+		// 		all.push({
+		// 			tag: intent,
+		// 			examples: this.intents[intent],
+		// 		});
 
-				return all;
-			},
-			[]
-		);
+		// 		return all;
+		// 	},
+		// 	[]
+		// );
 
-		await this.classifier.train(intentsToTrain);
-
-		console.info('Done Training Intents');
-
-		console.info('assistant ready');
+		// await this.classifier.train(intentsToTrain);
+		console.info(`Assistant Ready | ${this.currentSkills.size} Skills Loaded`);
 	}
 
 	getPlugin<T extends AssistantPlugin = AssistantPlugin>(plugin: string) {
@@ -280,11 +244,16 @@ export class Assistant extends Loadable {
 	}
 
 	addIntent(intent: IIntent) {
-		if (!this.intents[intent.tag]) {
-			this.intents[intent.tag] = [];
-		}
+		// if (!this.intents[intent.tag]) {
+		// 	this.intents[intent.tag] = [];
+		// }
 
-		this.intents[intent.tag].push(...intent.examples);
+		// this.intents[intent.tag].push(...intent.examples);
+		if (!this.intents[intent.tag]) {
+			this.intents[intent.tag] = intent;
+		} else {
+			this.intents[intent.tag].examples.push(...intent.examples);
+		}
 
 		if (!this.currentSkills.has(intent.tag)) {
 			this.currentSkills.set(intent.tag, []);
@@ -406,80 +375,121 @@ export class Assistant extends Loadable {
 			return [];
 		}
 
-		console.log(promptAnalysis);
+		const intentResult = await this.classifier.classify(
+			promptAnalysis.command,
+			Object.values(this.intents)
+		);
 
-		const { confidence, intent } = (
-			await this.classifier.classify(promptAnalysis.command)
-		)[0];
-
-		console.info(confidence, intent);
-
-		if (confidence > Assistant.SKILL_START_CONFIDENCE) {
-			if (intent === 'chat_mode_on' || intent === 'chat_mode_off') {
-				if (intent === 'chat_mode_on' && !this.bIsInChatMode) {
-					this.bIsInChatMode = true;
-					context.reply('Chat mode on.');
-					return;
-				} else if (this.bIsInChatMode) {
-					this.bIsInChatMode = false;
-					context.reply('Chat mode off.');
-					return;
-				}
-			}
+		if (!intentResult) {
+			return;
 		}
 
-		if (!this.bIsInChatMode && confidence > Assistant.SKILL_START_CONFIDENCE) {
-			const skills = this.currentSkills.get(intent);
+		const { intent, entities } = intentResult;
 
-			if (!skills) {
-				context.reply(
-					'I do not have any skills that can handle that right now.'
-				);
-				return [];
-			}
+		const skills = this.currentSkills.get(intent);
 
-			const skillsToStart = skills.filter((s) => {
-				if (s.shouldExecute(intent, context, promptAnalysis.command)) {
-					return true;
-				}
-				return false;
-			});
-
-			const activationIds = skillsToStart.map((s) => {
-				const skillInstance = new SkillInstance(
-					context,
-					promptAnalysis.command,
-					intent,
-					s
-				);
-
-				skillInstance.run();
-				this.emit('onSkillActivate', skillInstance.id);
-				return skillInstance.id;
-			});
-
-			if (activationIds.length > 0) {
-				console.info('Activation Ids:', activationIds);
-				return activationIds;
-			}
+		if (!skills) {
+			context.reply('I do not have any skills that can handle that right now.');
+			return [];
 		}
 
-		try {
-			const response = await this.chat.getResponse(
-				context.sessionId,
-				promptAnalysis.command
+		const activatedSkills: string[] = [];
+
+		skills.forEach((s) => {
+			const skillInstance = new SkillInstance(
+				context,
+				promptAnalysis.command,
+				intent,
+				entities,
+				s
 			);
-			if (response.length) {
-				context.reply(response);
-				return [];
+
+			if (!s.shouldExecute(skillInstance)) {
+				return;
 			}
-		} catch (error) {
-			console.error(error);
+
+			skillInstance.run();
+
+			activatedSkills.push(skillInstance.id);
+		});
+
+		if (activatedSkills.length === 0) {
+			context.reply(`I dont have the brain cells to understand this`);
 		}
 
-		context.reply(`I dont have the brain cells to understand this`);
+		// console.log(promptAnalysis);
 
-		return [];
+		// // const { confidence, intent } = (
+		// // 	await this.classifier.classify(promptAnalysis.command)
+		// // )[0];
+
+		// const { confidence, intent } = { confidence: 0, intent: 'none' };
+		// console.info(confidence, intent);
+
+		// if (confidence > Assistant.SKILL_START_CONFIDENCE) {
+		// 	if (intent === 'chat_mode_on' || intent === 'chat_mode_off') {
+		// 		if (intent === 'chat_mode_on' && !this.bIsInChatMode) {
+		// 			this.bIsInChatMode = true;
+		// 			context.reply('Chat mode on.');
+		// 			return;
+		// 		} else if (this.bIsInChatMode) {
+		// 			this.bIsInChatMode = false;
+		// 			context.reply('Chat mode off.');
+		// 			return;
+		// 		}
+		// 	}
+		// }
+
+		// if (!this.bIsInChatMode && confidence > Assistant.SKILL_START_CONFIDENCE) {
+		// 	const skills = this.currentSkills.get(intent);
+
+		// 	if (!skills) {
+		// 		context.reply(
+		// 			'I do not have any skills that can handle that right now.'
+		// 		);
+		// 		return [];
+		// 	}
+
+		// 	const skillsToStart = skills.filter((s) => {
+		// 		if (s.shouldExecute(intent, context, promptAnalysis.command)) {
+		// 			return true;
+		// 		}
+		// 		return false;
+		// 	});
+
+		// 	const activationIds = skillsToStart.map((s) => {
+		// 		const skillInstance = new SkillInstance(
+		// 			context,
+		// 			promptAnalysis.command,
+		// 			intent,
+		// 			s
+		// 		);
+
+		// 		skillInstance.run();
+		// 		this.emit('onSkillActivate', skillInstance.id);
+		// 		return skillInstance.id;
+		// 	});
+
+		// 	if (activationIds.length > 0) {
+		// 		console.info('Activation Ids:', activationIds);
+		// 		return activationIds;
+		// 	}
+		// }
+
+		// try {
+		// 	const response = await this.chat.getResponse(
+		// 		context.sessionId,
+		// 		promptAnalysis.command
+		// 	);
+		// 	if (response.length) {
+		// 		context.reply(response);
+		// 		return [];
+		// 	}
+		// } catch (error) {
+		// 	console.error(error);
+		// }
+
+		return activatedSkills;
 	}
 }
 

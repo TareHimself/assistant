@@ -34,7 +34,7 @@ class Vocabulary:
     def index(self, item: str) -> int:
         return self.vocab.get(item, 1)
 
-    def __call__(self, words: list, length: int) -> list[int]:
+    def __call__(self, words: list, length: int, use_sub=False) -> list[int]:
         words_length = len(words)
         return [self.index(words[x]) if x < words_length else 0 for x in range(length)]
 

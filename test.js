@@ -5,14 +5,15 @@ async function main() {
 	const client = new Client();
 	const StreamClient = new DiscordStreamClient(client);
 
-	const token = '';
+	const token =
+		'ODc1MTE2NTI4NDgyMjYzMDYw.GApxt2.Av90e8CY9tIAvgVEIx1L1EWNJsCBKugzjX9Dtw'; //'';
 
 	client.login(token);
 
 	client.on('ready', async () => {
 		// Connect to a voice channel
 		const voiceConnection = await StreamClient.joinVoiceChannel(
-			client.channels.cache.get('727991843756965900'),
+			client.channels.cache.get('766775964326953041'),
 			{
 				selfDeaf: false,
 				selfMute: true,
@@ -22,7 +23,10 @@ async function main() {
 		// I want to use screen sharing ...
 		const streamConnection = await voiceConnection.createStream();
 		// Create a player
-		const player = StreamClient.createPlayer('', streamConnection.udp);
+		const player = StreamClient.createPlayer(
+			'C:\\Users\\Taree\\Videos\\Genshin Impact 2023-01-08 02-31-16 - Trim.mp4',
+			streamConnection.udp
+		);
 		// Events
 		player.on('finish', () => {
 			console.log('Finished playing');

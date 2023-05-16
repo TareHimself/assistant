@@ -4,18 +4,17 @@ import {
 	AssistantSkill,
 	SkillInstance,
 } from '@core/assistant';
-import { IIntent } from '@core/types';
+import { IIntent, IParsedEntity } from '@core/types';
 const math = require('mathjs');
-import { delay, pad } from '@core/utils';
+import { mostLikelyOption, pad } from '@core/utils';
 import { wordsToDigits } from '@core/conversion';
 import { PythonProcess } from '@core/subprocess';
 import { compareTwoStrings } from 'string-similarity';
-import { ELoadableState } from '@core/base';
+import { ELoadableState, EntityExtractionError } from '@core/base';
+import { CgasApi } from '@core/singletons';
+import { v4 as uuidv4 } from 'uuid';
 
-type ArithmeticSkillData = {
-	expression: string;
-};
-class ArithmeticSkill extends AssistantSkill<ArithmeticSkillData> {
+class ArithmeticSkill extends AssistantSkill {
 	static OPERATORS: Record<string, string> = {
 		'divided by': '/',
 		times: '*',
@@ -35,7 +34,21 @@ class ArithmeticSkill extends AssistantSkill<ArithmeticSkillData> {
 	override get intents(): IIntent[] {
 		return [
 			{
-				tag: 'skill_arithmetic',
+				tag: 'math',
+				description: 'solves arithmetic expressions',
+				entities: [
+					{
+						tag: 'expr',
+						description: 'the expression to solve',
+						extractor: (p) => {
+							const expression = this.promptToExpression(p);
+							if (expression.length === 0) {
+								throw new EntityExtractionError();
+							}
+							return expression;
+						},
+					},
+				],
 				examples: [
 					'[math | calculate | arithmetic] nine minus six',
 					'[math | calculate | arithmetic] 9 minus 4000',
@@ -62,45 +75,41 @@ class ArithmeticSkill extends AssistantSkill<ArithmeticSkillData> {
 			.trim();
 	}
 
-	override shouldExecute(
-		intent: string,
-		source: AssistantContext,
-		prompt: string
-	): boolean {
-		return this.promptToExpression(prompt).length > 0;
+	override shouldExecute(instance: SkillInstance): boolean {
+		return instance.entities.some((a) => a.entity === 'expr');
 	}
 
-	override async dataExtractor(
-		instance: SkillInstance
-	): Promise<ArithmeticSkillData> {
-		return {
-			expression: this.promptToExpression(instance.prompt),
-		};
-	}
-
-	override async execute(
-		instance: SkillInstance,
-		data: ArithmeticSkillData
-	): Promise<void> {
+	override async execute(instance: SkillInstance): Promise<void> {
 		instance.context.reply(
 			ArithmeticSkill.POSSIBLE_RESPONSES.random().replace(
 				'@ans',
-				`${math.evaluate(data.expression)}`
+				`${math.evaluate(
+					this.promptToExpression(
+						instance.entities.find((a) => a.entity === 'expr')?.data || ''
+					)
+				)}`
 			)
 		);
 	}
 }
 
-type GenerateImageSkillData = {
-	tags: string;
-};
-
-class GenerateImageSkill extends AssistantSkill<GenerateImageSkillData> {
+class GenerateImageSkill extends AssistantSkill {
 	override get intents(): IIntent[] {
 		return [
 			{
-				tag: 'skill_generate_anime',
+				tag: 'gen',
+				description: 'generate images using stable diffusion',
+				entities: [
+					{
+						tag: 'prompt',
+						description: 'the prompt to use',
+						extractor: (a) => a.split(' ').slice(1).join(' '),
+					},
+				],
 				examples: [
+					'generate microphone',
+					'generate mask, school',
+					'generate a man with a big jaw',
 					'generate #unk',
 					'generate school',
 					'generate #unk, #unk eyes',
@@ -108,13 +117,11 @@ class GenerateImageSkill extends AssistantSkill<GenerateImageSkillData> {
 					'generate red trees, #unk, two tables',
 					'generate masterpiece, best quality, upper body, 1girl, looking at viewer, #unk hair, medium hair, #unk eyes, #unk horns, black coat, indoors',
 					'generate masterpiece, big booty, #unk, goth, woman, purple eyes',
-					'generate ninja, shuriken, #unk, stealth, assassin',
+					'generate ( ninja ), shuriken, #unk, stealth, ( assassin )',
 					'generate chef, apron, #unk, spatula',
 					'generate wizard, hat, #unk, spells, magic',
-					'generate detective, magnifying glass, #unk coat, fedora',
-					'generate athlete, jersey, #unk, sneakers, water bottle',
 					'generate pirate, eyepatch, #unk, peg leg',
-					'generate vampire, #unk, coffin, cape, blood',
+					'generate (vampire), #unk, coffin, ( cape), blood',
 					'generate werewolf, claws, #unk moon, howl',
 					'generate superhero, mask, cape, superpowers, secret identity',
 					'generate angel, wings, halo, divine, guardian',
@@ -123,7 +130,7 @@ class GenerateImageSkill extends AssistantSkill<GenerateImageSkillData> {
 					'generate mermaid, #unk bra, tail, underwater, mythical',
 					'generate cowboy, hat, #unk, spurs, lasso',
 					'generate spy, #unk, briefcase, stealth, espionage',
-					'generate musician, guitar, #unk, stage, performance',
+					'generate (musician), guitar, #unk, stage, performance',
 					'generate firefighter, #unk, helmet, hose, bravery',
 					'generate samurai, armor, sword, honor, bushido',
 					'generate ghost, #unk, white sheet, haunting, supernatural',
@@ -131,29 +138,27 @@ class GenerateImageSkill extends AssistantSkill<GenerateImageSkillData> {
 					'generate wings, horns, #unk hair, medieval dress, girl, standing on a cliff, demon, sword',
 					'generate glowing eyes, fur, ripped jeans, male, monster, black hair, #unk a cigarette, leather jacket, motorcycle',
 					'generate dark alley, woman, witch, black dress, #unk hair, holding a spell book, glowing red eyes',
-					'generate beach scene, merman, #unk hair, trident, tattoos, seashell necklace, man',
-					'generate futuristic space station, android, red eyes, #unk hair, holding a laser sword, black bodysuit, woman',
-					'generate concert stage, male, rockstar, #unk pants, ripped shirt, electric guitar, long hair, tattoos',
-					'generate snowy forest, girl, white hair, wolf ears, blue eyes, holding #unk, fur cloak',
 					'generate abandoned warehouse, woman, #unk, black catsuit, red eyes, short black hair, holding a knife',
 					'generate moonlit garden, vampire, woman, red dress, long black hair, holding a glass of red wine',
 					'generate underwater ruins, mermaid, #unk hair, trident, scales, green eyes, woman',
-					'generate post-apocalyptic wasteland, man, survivor, gas mask, brown trench coat, holding a shotgun',
-					'generate enchanted forest, elf, girl, #unk hair, pointed ears, holding a bow and arrow, brown eyes',
-					'generate cyberpunk city, woman, hacker, black bodysuit, #unk hair, holding a laptop, red eyes',
-					'generate dark castle, man, warlock, red robes, bald, holding a crystal ball, white beard',
 					'generate amusement park, clown, woman, red nose, polka dot dress, holding a #unk animal',
 					'generate ancient temple, man, archeologist, fedora hat, brown leather jacket, holding a #unk',
 					'generate mystical garden, woman, druid, green dress, long brown hair, holding a #unk',
 					'generate jungle scene, man, explorer, pith helmet, khaki shirt, holding a #unk',
+					'generate (best quality, masterpiece), 1girl, particle, wind, flower, upper body, dark simple background, looking at viewer, blonde, galaxy <params:size:504x1009> <params:seed:736669780> <params:control:8> <params:steps:25>',
 				],
 			},
 		];
 	}
 
-	generator = new PythonProcess('image_generator.py');
+	generator = new PythonProcess('diffusion.py');
 	isGeneratingImage = false;
 	generationQueue: (() => any)[] = [];
+	static AVAILABLE_MODELS = {
+		normal: 'HeWhoRemixes/anything-v4.5-pruned-fp16',
+		pastel: 'HeWhoRemixes/pastelmix-better-vae-fp16',
+		cartoon: 'HeWhoRemixes/seekyou-alpha1-fp16',
+	};
 
 	override async onLoad(): Promise<void> {
 		// this.generator.on('onProcessStdout', (b) => console.info(b.toString()));
@@ -161,47 +166,54 @@ class GenerateImageSkill extends AssistantSkill<GenerateImageSkillData> {
 		await this.generator.waitForState(ELoadableState.ACTIVE);
 	}
 
-	override async dataExtractor(
-		instance: SkillInstance
-	): Promise<GenerateImageSkillData> {
-		return {
-			tags: instance.prompt.replace('generate', ''),
-		};
+	override shouldExecute(instance: SkillInstance): boolean {
+		return instance.entities.find((a) => a.entity === 'prompt') !== undefined;
 	}
 
-	override async execute(
-		instance: SkillInstance,
-		data: GenerateImageSkillData
-	): Promise<void> {
-		const type = (
-			(await instance.context.getInput(
-				'What style would you like , pastel or normal ?'
-			)) || ''
-		).toLowerCase();
-
-		const bShouldUsePastel =
-			compareTwoStrings(type, 'pastel') > compareTwoStrings(type, 'normal');
-
-		const selectedModel = bShouldUsePastel ? 1 : 2;
-
-		console.info(`Using ${bShouldUsePastel ? 'pastel' : 'normal'} model`);
-
+	waitForTurn(instance: SkillInstance) {
 		if (this.isGeneratingImage) {
-			await new Promise<void>((res) => {
+			return new Promise<void>((res) => {
 				this.generationQueue.push(res);
 				instance.context.reply(
 					`Your request has been queued, position ${this.generationQueue.length}`
 				);
 			});
 		}
-
 		this.isGeneratingImage = true;
+	}
+
+	override async execute(instance: SkillInstance): Promise<void> {
+		const possibleTypes = Object.keys(GenerateImageSkill.AVAILABLE_MODELS);
+
+		const type = (
+			(await instance.context.getInput(
+				`What style would you like ${possibleTypes.join(', ')} ?`
+			)) || ''
+		).toLowerCase();
+
+		let selection = mostLikelyOption(type, possibleTypes);
+
+		if (GenerateImageSkill.AVAILABLE_MODELS[selection].length === 0) {
+			// cartoon does not work
+			selection = possibleTypes[0];
+		}
+		console.info(`Using ${selection} model`);
+
+		const needToWait = this.waitForTurn(instance);
+		if (needToWait !== undefined) {
+			await needToWait;
+		}
 
 		instance.context.reply('Generating');
 
-		const [op, response] = await this.generator.sendAndWait(
-			Buffer.from(data.tags),
-			selectedModel
+		const [_, generatedImage] = await this.generator.sendAndWait(
+			Buffer.from(
+				JSON.stringify({
+					model_id: GenerateImageSkill.AVAILABLE_MODELS[selection],
+					prompt:
+						instance.entities.find((a) => a.entity === 'prompt')?.data || '',
+				})
+			)
 		);
 
 		const pending = this.generationQueue.pop();
@@ -212,18 +224,21 @@ class GenerateImageSkill extends AssistantSkill<GenerateImageSkillData> {
 			this.isGeneratingImage = false;
 		}
 
-		await instance.context.replyImage(response);
+		const uploadedImage = await CgasApi.get().upload(
+			`generate-image-${uuidv4()}.png`,
+			generatedImage
+		);
 
-		instance.context.reply(`Done Generating`);
+		if (!uploadedImage) {
+			instance.context.reply('There was an issue uploading the image.');
+			return;
+		}
+
+		await instance.context.reply(`Done Generating ${uploadedImage.url}`);
 	}
 }
 
-type IScheduleAddParams = {
-	task: string;
-	time: string;
-};
-
-class ScheduleSkill extends AssistantSkill<IScheduleAddParams> {
+class ScheduleSkill extends AssistantSkill {
 	extractionRegexp = new RegExp(
 		/(?:remind (?:me (?:to )))?(.+?)(?:\sin(?: a| an)?|\sat)\s(.*)/,
 		'i'
@@ -231,7 +246,18 @@ class ScheduleSkill extends AssistantSkill<IScheduleAddParams> {
 	override get intents(): IIntent[] {
 		return [
 			{
-				tag: 'skill_schedule_add',
+				tag: 's_sch_add',
+				description: 'add a task to my schedule',
+				entities: [
+					// {
+					// 	tag: 'task',
+					// 	description: 'the task to add',
+					// },
+					// {
+					// 	tag: 'time',
+					// 	description: 'target time',
+					// },
+				],
 				examples: [
 					'remind me to smoke weed at five am',
 					'remind me to take a shit by twelve pm',
@@ -247,26 +273,16 @@ class ScheduleSkill extends AssistantSkill<IScheduleAddParams> {
 		];
 	}
 
-	override shouldExecute(
-		intent: string,
-		source: AssistantContext,
-		prompt: string
-	): boolean {
-		return prompt.match(this.extractionRegexp) !== null;
+	override shouldExecute(instance: SkillInstance): boolean {
+		return instance.entities.length === 2;
 	}
 
-	override async dataExtractor(
-		instance: SkillInstance
-	): Promise<IScheduleAddParams> {
-		const [_, task, time] = instance.prompt.match(this.extractionRegexp)!;
-		return {
-			task: task,
-			time: time,
-		};
+	override async execute(instance: SkillInstance): Promise<void> {
+		console.log('Remind command', instance.context);
 	}
 }
 
-class TimeSkill extends AssistantSkill<null> {
+class TimeSkill extends AssistantSkill {
 	static POSSIBLE_RESPONSES = [
 		'The time is @ans',
 		"Right now it's @ans",
@@ -276,17 +292,19 @@ class TimeSkill extends AssistantSkill<null> {
 	override get intents(): IIntent[] {
 		return [
 			{
-				tag: 'skill_time',
-				examples: ['what time is it', 'time'],
+				tag: 's_time',
+				description: 'gets the time',
+				entities: [],
+				examples: ['what time is it', 'time', 'time pls', 'time boii'],
 			},
 		];
 	}
 
-	override async dataExtractor(instance: SkillInstance): Promise<null> {
-		return null;
+	override shouldExecute(instance: SkillInstance): boolean {
+		return true;
 	}
 
-	override async execute(instance: SkillInstance, data: null): Promise<void> {
+	override async execute(instance: SkillInstance): Promise<void> {
 		const date = new Date();
 		instance.context.reply(
 			TimeSkill.POSSIBLE_RESPONSES.random().replace(
@@ -309,40 +327,7 @@ export default class BasePlugin extends AssistantPlugin {
 			new ArithmeticSkill(),
 			new TimeSkill(),
 			new ScheduleSkill(),
-			//new GenerateImageSkill(),
-			new (class PromptTest extends AssistantSkill<null> {
-				get intents() {
-					return [
-						{
-							tag: 'test_prompt',
-							examples: ['prompt test'],
-						},
-					];
-				}
-
-				override async dataExtractor(instance: SkillInstance): Promise<null> {
-					return null;
-				}
-				override async execute(
-					instance: SkillInstance,
-					data: null
-				): Promise<void> {
-					do {
-						const response = await instance.context.getInput(
-							'Say something pls'
-						);
-						instance.context.reply(`You said \`${response}\``);
-						await delay(1000);
-					} while (
-						!(await instance.context.getInput('Do you want to do it again ?'))
-							?.toLowerCase()
-							.trim()
-							.startsWith('n')
-					);
-
-					instance.context.reply(`Prompt test over`);
-				}
-			})(),
+			new GenerateImageSkill(),
 		];
 	}
 }

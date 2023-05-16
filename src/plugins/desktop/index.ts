@@ -6,6 +6,7 @@ import path from 'path';
 import * as fs from 'fs';
 import { BrowserWindow } from 'electron';
 import { digitsToWords } from '@core/conversion';
+import { CgasApi } from '@core/singletons';
 export class DesktopContext extends AssistantContext {
 	plugin: DesktopPlugin;
 
@@ -54,13 +55,13 @@ export class DesktopContext extends AssistantContext {
 	}
 
 	override async replyImage(data: Buffer): Promise<boolean> {
-		const imageDir = path.join(this.plugin.tempDir, uuidv4() + '.png');
-		await fs.promises.writeFile(imageDir, data);
+		const uploadInfo = await CgasApi.get().upload(uuidv4() + '.png', data);
+		if (!uploadInfo) return false;
 		const displayWindow = new BrowserWindow({});
-		displayWindow.on('close', () => {
-			fs.unlinkSync(imageDir);
-		});
-		await displayWindow.loadURL(`file:///${imageDir}`);
+		// displayWindow.on('close', () => {
+		// 	fs.unlinkSync(imageDir);
+		// });
+		await displayWindow.loadURL(uploadInfo.url);
 		return true;
 	}
 }
@@ -69,7 +70,6 @@ export default class DesktopPlugin extends AssistantPlugin {
 	tts: PythonProcess;
 	stt: PythonProcess;
 	window?: BrowserWindow;
-	tempDir = '';
 
 	constructor() {
 		super();
@@ -102,17 +102,5 @@ export default class DesktopPlugin extends AssistantPlugin {
 
 			this.assistant.tryStartSkill(pack.toString(), new DesktopContext(this));
 		});
-
-		this.tempDir = path.join(this.dataPath, 'temp');
-
-		try {
-			await fs.promises.mkdir(this.tempDir, {
-				recursive: true,
-			});
-		} catch (error) {
-			console.error(error);
-		}
-
-		console.info('Using temp dir', this.tempDir);
 	}
 }

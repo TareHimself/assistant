@@ -1,5 +1,6 @@
 import path from 'path';
 import { createInterface } from 'readline';
+import { compareTwoStrings } from 'string-similarity';
 
 export function pad(number: number, ammount = 5) {
 	let start = `${number}`;
@@ -55,4 +56,21 @@ export function delay(length: number) {
 	return new Promise<void>((res) => {
 		setTimeout(res, length);
 	});
+}
+
+export function mostLikelyOption<T extends string>(
+	selection: string,
+	options: T[]
+): T {
+	return options.reduce<[T, number]>(
+		(final, current) => {
+			const similarity = compareTwoStrings(current, selection);
+			if (similarity > final[1]) {
+				return [current, similarity];
+			}
+
+			return final;
+		},
+		[options[0], 0]
+	)[0];
 }

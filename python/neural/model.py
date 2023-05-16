@@ -97,16 +97,15 @@ class IntentsNeuralNet(nn.Module):
         self.e_dim = embed_dimensions
         self.h_size = hidden_size
         self.classes = classes
-        self.device = torch.device('cpu')
+        self.device = torch.device("cpu")
         self.em = nn.EmbeddingBag(len(self.vocab), self.e_dim, sparse=False)
-        self.lstm = nn.LSTM(input_size=self.e_dim,
-                            hidden_size=self.h_size, num_layers=5, dropout=0.3)
+        self.lstm = nn.LSTM(
+            input_size=self.e_dim, hidden_size=self.h_size, num_layers=2, dropout=0.4
+        )
         self.fc1 = nn.Linear(self.h_size, len(self.classes))
 
     def forward(self, tokens: Tensor):
-
-        offset = None if len(tokens.shape) > 1 else torch.IntTensor(
-            [0]).to(self.device)
+        offset = None if len(tokens.shape) > 1 else torch.IntTensor([0]).to(self.device)
 
         x = self.em(tokens, offset)
 
@@ -116,15 +115,18 @@ class IntentsNeuralNet(nn.Module):
 
         return x
 
-    def save(self, hash: str, path: str):
-        torch.save({
-            "state": self.state_dict(),
-            "vocab": self.vocab.vocab,
-            "e_dim": self.e_dim,
-            "h_size": self.h_size,
-            "classes": self.classes,
-            "hash": hash
-        }, path)
+    def save(self, weights, hash: str, path: str):
+        torch.save(
+            {
+                "state": self.state_dict() if weights is None else weights,
+                "vocab": self.vocab.vocab,
+                "e_dim": self.e_dim,
+                "h_size": self.h_size,
+                "classes": self.classes,
+                "hash": hash,
+            },
+            path,
+        )
 
     def predict(self, text: str):
         sentence = tokenize(text)
@@ -137,26 +139,29 @@ class IntentsNeuralNet(nn.Module):
         probs = torch.softmax(output, dim=1)
         prob = probs[0][predicated.item()]
 
-        print(probs)
-        all_classes = [{
-            "intent": self.classes[x],
-            "confidence": probs[0][x].item()
-        }
-            for x in range(len(self.classes))]
+        all_classes = [
+            {"intent": self.classes[x], "confidence": probs[0][x].item()}
+            for x in range(len(self.classes))
+        ]
 
-        all_classes.sort(key=lambda a: a['confidence'], reverse=True)
+        all_classes.sort(key=lambda a: a["confidence"], reverse=True)
 
         return all_classes
 
     @staticmethod
     def load(path: str):
         loaded_data = torch.load(path)
-        model = IntentsNeuralNet(Vocabulary(
-            loaded_data['vocab']), loaded_data['e_dim'], loaded_data['h_size'], loaded_data['classes'])
-        model.load_state_dict(loaded_data['state'])
+        model = IntentsNeuralNet(
+            Vocabulary(loaded_data["vocab"]),
+            loaded_data["e_dim"],
+            loaded_data["h_size"],
+            loaded_data["classes"],
+        )
+        model.load_state_dict(loaded_data["state"])
         return model
 
     def to_device(self, d):
+        self.device = d
         return self.to(d)
 
 
