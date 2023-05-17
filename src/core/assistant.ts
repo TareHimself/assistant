@@ -165,12 +165,10 @@ export class Assistant extends Loadable {
 			this.emit('onReady', this);
 		});
 		console.info('Loading assistant');
-		this.load();
-	}
-
-	override async onLoadError(error: Error): Promise<void> {
-		console.error(error);
-		process.exit();
+		this.load().catch((error) => {
+			console.error(error);
+			process.exit();
+		});
 	}
 
 	override async onLoad() {
@@ -201,13 +199,19 @@ export class Assistant extends Loadable {
 
 		await Promise.all(
 			plugins.map((plugin) =>
-				this.usePlugin(
-					new (require(path.join(
-						PLUGINS_PATH,
-						plugin,
-						'index.js'
-					)).default)() as AssistantPlugin
-				)
+				(async () => {
+					try {
+						await this.usePlugin(
+							new (require(path.join(
+								PLUGINS_PATH,
+								plugin,
+								'index.js'
+							)).default)() as AssistantPlugin
+						);
+					} catch (error) {
+						console.error(error);
+					}
+				})()
 			)
 		);
 		console.info('Plugins loaded');
@@ -217,25 +221,6 @@ export class Assistant extends Loadable {
 		console.info('Training Intent classifier');
 		await this.classifier.train(Object.values(this.intents));
 		console.info('Intent classifier trained');
-		// console.info('Loading chat process');
-		// await this.chat.load();
-		// console.info('Chat process loaded');
-
-		// console.info('Training Intents');
-
-		// const intentsToTrain = Object.keys(this.intents).reduce<IIntent[]>(
-		// 	(all, intent) => {
-		// 		all.push({
-		// 			tag: intent,
-		// 			examples: this.intents[intent],
-		// 		});
-
-		// 		return all;
-		// 	},
-		// 	[]
-		// );
-
-		// await this.classifier.train(intentsToTrain);
 		console.info(`Assistant Ready | ${this.currentSkills.size} Skills Loaded`);
 	}
 
@@ -262,13 +247,18 @@ export class Assistant extends Loadable {
 
 	async useSkill(skill: AssistantSkill) {
 		console.info(`Loading skill ${skill.constructor.name}`);
-		await skill.load();
-		skill.intents.forEach((intent) => {
-			this.addIntent(intent);
+		try {
+			await skill.load();
+			skill.intents.forEach((intent) => {
+				this.addIntent(intent);
 
-			this.currentSkills.get(intent.tag)?.push(skill);
-		});
-		console.info(`Loaded skill ${skill.constructor.name}`);
+				this.currentSkills.get(intent.tag)?.push(skill);
+			});
+			console.info(`Loaded skill ${skill.constructor.name}`);
+		} catch (error) {
+			console.info(`Failed to load skill ${skill.constructor.name}`);
+			console.error(error);
+		}
 	}
 
 	async usePlugin(plugin: AssistantPlugin) {

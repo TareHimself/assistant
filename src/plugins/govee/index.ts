@@ -13,10 +13,10 @@ class LightsControlOn extends AssistantSkill {
 				description: 'turns on lights',
 				entities: [],
 				examples: [
-					'Turn on the lights',
-					'lights on',
-					'lights',
-					'let there be light',
+					'[T|t]urn on the lights',
+					'[L|l]ights on',
+					'[L|l]ights',
+					'[L|l]et there be light',
 				],
 			},
 		];
@@ -34,7 +34,7 @@ class LightsControlOff extends AssistantSkill {
 				tag: 'lights_off',
 				description: 'turns off lights',
 				entities: [],
-				examples: ['Turn off the lights', 'lights off'],
+				examples: ['[T|t]urn off the lights', '[L|l]ights off'],
 			},
 		];
 	}

@@ -2,18 +2,15 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from torch.utils.data import Dataset
-from neural.utils import tokenize, Vocabulary, increase_size, extract_entities
+from neural.utils import Vocabulary, increase_size, extract_entities
 
 
 class IntentsDataset(Dataset):
-    def __init__(self, d: list, tokenizer=tokenize, max_tokens=64):
+    def __init__(self, d: list):
         self.tags = []
         self.train_examples = []
         self.train_labels = []
         self.train_entities = []
-        self.tokenizer = tokenizer
-        self.words_vocab = Vocabulary()
-        self.entities_vocab = Vocabulary(initial={"#pad": 0, "O": 1})
         count = []
         unbalanced = []
 
@@ -39,20 +36,21 @@ class IntentsDataset(Dataset):
 
             all_entities.extend(list(entities))
 
-        self.words_vocab.add(all_words)
-        self.entities_vocab.add(all_entities)
+        self.words_vocab = Vocabulary.to_vocab(all_words, 600)
+        # self.entities_vocab.add(all_entities)
         all_words = []
         all_entities = []
 
         for i in range(len(self.train_examples)):
             self.train_examples[i] = np.array(
-                self.words_vocab(self.train_examples[i], max_tokens)
+                self.words_vocab(" ".join(self.train_examples[i]), pad=True)
             )
+            self.train_entities[i] = np.array([0])
 
-        for i in range(len(self.train_entities)):
-            self.train_entities[i] = np.array(
-                self.entities_vocab(self.train_entities[i], max_tokens)
-            )
+        # for i in range(len(self.train_entities)):
+        #     self.train_entities[i] = np.array(
+        #         self.entities_vocab(self.train_entities[i], max_tokens)
+        #     )
 
     def __len__(self):
         return len(self.train_examples)

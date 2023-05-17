@@ -2,7 +2,7 @@ import torch
 
 from torch import nn, mm, Tensor
 import torch.nn.functional as F
-from neural.utils import PYTORCH_DEVICE, Vocabulary, tokenize
+from neural.utils import PYTORCH_DEVICE, Vocabulary
 
 # class IntentsNeuralNet(nn.Module):
 #     def __init__(self, vocab_dize, embed_dimensions, hidden_size, num_classes):
@@ -100,7 +100,7 @@ class IntentsNeuralNet(nn.Module):
         self.device = torch.device("cpu")
         self.em = nn.EmbeddingBag(len(self.vocab), self.e_dim, sparse=False)
         self.lstm = nn.LSTM(
-            input_size=self.e_dim, hidden_size=self.h_size, num_layers=2, dropout=0.4
+            input_size=self.e_dim, hidden_size=self.h_size, num_layers=2, dropout=0.5
         )
         self.fc1 = nn.Linear(self.h_size, len(self.classes))
 
@@ -129,11 +129,9 @@ class IntentsNeuralNet(nn.Module):
         )
 
     def predict(self, text: str):
-        sentence = tokenize(text)
-        x = self.vocab(sentence, 64)
+        x = self.vocab(text, pad=True)
         x = torch.IntTensor(x)
         output = self(x)
-        print(output)
         _, predicated = torch.max(output, dim=1)
 
         probs = torch.softmax(output, dim=1)

@@ -151,7 +151,7 @@ export default class DiscordPlugin extends AssistantPlugin {
 			});
 
 			try {
-				this.client.login(process.env.DISCORD_BOT_TOKEN);
+				this.client.login(process.env.DISCORD_BOT_TOKEN).catch(rej);
 			} catch (error) {
 				rej(error);
 			}

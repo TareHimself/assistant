@@ -87,12 +87,8 @@ export abstract class Loadable extends AssistantObject {
 		)
 			return;
 
-		await this.onLoad().catch(this.onLoadError.bind(this));
+		await this.onLoad();
 		this.state = ELoadableState.ACTIVE;
-	}
-
-	async onLoadError(error: Error) {
-		throw error;
 	}
 
 	async onLoad() {}
