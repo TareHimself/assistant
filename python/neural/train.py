@@ -12,9 +12,9 @@ from tqdm import tqdm
 def train_intents(
     intents: list,
     save_path: str,
-    batch_size=64,
-    learning_rate=0.001,
-    epochs=350,
+    batch_size=32,
+    learning_rate=0.0001,
+    epochs=3000,
     patience=30,
 ):
     expand_all_examples(intents)
@@ -29,32 +29,32 @@ def train_intents(
 
     dataset = IntentsDataset(intents)
 
-    def collate_data(batch):
-        nonlocal dataset
-        # rearrange a batch and compute offsets too
-        # needs a global vocab and tokenizer
-        label_lst, review_lst, offset_lst = [], [], [0]
-        for _lbl, _rvw in batch:
-            label_lst.append(int(_lbl))  # string to int
-            idxs = []
-            for tok in _rvw:
-                idxs.append(dataset.words_vocab[tok])
+    # def collate_data(batch):
+    #     nonlocal dataset
+    #     # rearrange a batch and compute offsets too
+    #     # needs a global vocab and tokenizer
+    #     label_lst, review_lst, offset_lst = [], [], [0]
+    #     for _lbl, _rvw in batch:
+    #         label_lst.append(int(_lbl))  # string to int
+    #         idxs = []
+    #         for tok in _rvw:
+    #             idxs.append(dataset.words_vocab[tok])
 
-            idxs = torch.tensor(idxs, dtype=torch.int64)  # to tensor
-            review_lst.append(idxs)
-            offset_lst.append(len(idxs))
+    #         idxs = torch.tensor(idxs, dtype=torch.int64)  # to tensor
+    #         review_lst.append(idxs)
+    #         offset_lst.append(len(idxs))
 
-        label_lst = torch.tensor(label_lst, dtype=torch.int64).to(PYTORCH_DEVICE)
-        offset_lst = torch.tensor(offset_lst[:-1]).cumsum(dim=0).to(PYTORCH_DEVICE)
-        review_lst = torch.cat(review_lst).to(PYTORCH_DEVICE)  # 2 tensors to 1
+    #     label_lst = torch.tensor(label_lst, dtype=torch.int64).to(PYTORCH_DEVICE)
+    #     offset_lst = torch.tensor(offset_lst[:-1]).cumsum(dim=0).to(PYTORCH_DEVICE)
+    #     review_lst = torch.cat(review_lst).to(PYTORCH_DEVICE)  # 2 tensors to 1
 
-        return label_lst, review_lst, offset_lst
+    #     return label_lst, review_lst, offset_lst
 
     train_loader = DataLoader(
         dataset=dataset, batch_size=batch_size, num_workers=0, shuffle=True
     )
 
-    embed_dim = 100
+    embed_dim = 300
     hidden_size = 256
     print("device" + PYTORCH_DEVICE.__str__())
     model = IntentsNeuralNet(

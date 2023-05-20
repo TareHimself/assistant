@@ -54,14 +54,21 @@ export class DesktopContext extends AssistantContext {
 		});
 	}
 
-	override async replyImage(data: Buffer): Promise<boolean> {
-		const uploadInfo = await CgasApi.get().upload(uuidv4() + '.png', data);
-		if (!uploadInfo) return false;
+	override async replyImage(data: Buffer | string): Promise<boolean> {
+		let uri = '';
+		if (typeof data === 'string') {
+			uri = data;
+		} else {
+			const uploadInfo = await CgasApi.get().upload(uuidv4() + '.png', data);
+			if (!uploadInfo) return false;
+			uri = uploadInfo.url;
+		}
+
 		const displayWindow = new BrowserWindow({});
 		// displayWindow.on('close', () => {
 		// 	fs.unlinkSync(imageDir);
 		// });
-		await displayWindow.loadURL(uploadInfo.url);
+		await displayWindow.loadURL(uri);
 		return true;
 	}
 }
@@ -74,7 +81,7 @@ export default class DesktopPlugin extends AssistantPlugin {
 	constructor() {
 		super();
 		this.tts = new PythonProcess('tts.py', [this.dataPath]);
-		this.stt = new PythonProcess('empty.py', [this.dataPath]);
+		this.stt = new PythonProcess('stt.py', [this.dataPath]);
 		// this.window = new BrowserWindow({
 		// 	show: true,
 		// 	autoHideMenuBar: true,

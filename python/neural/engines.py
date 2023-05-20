@@ -1,4 +1,5 @@
 import torch
+import json
 from neural.model import IntentsNeuralNet, TokenClassificationNet
 from neural.utils import Vocabulary
 from neural.train import train_intents, train_entities
@@ -14,10 +15,15 @@ class IntentsEngine:
 
         self.model.eval()
 
+        with open("vocab_dump.json", "w") as vd:
+            json.dump(self.model.vocab.vocab, vd, indent=2)
+
     def update_intents(self, intents: list):
         train_intents(intents, self.model_path)
         IntentsNeuralNet.load(self.model_path)
         self.model.eval()
+        with open("vocab_dump.json", "w") as vd:
+            json.dump(self.model.vocab.vocab, vd, indent=2)
 
     def get_intent(self, msg: str):
         return self.model.predict(msg)

@@ -10,18 +10,21 @@ from sys import argv
 
 P_DEVICE = torch.device("cuda")
 generator = torch.Generator(device=P_DEVICE).manual_seed(3696906123)
-model_id = "pastelmix-better-vae-fp16"
+model_id = "HeWhoRemixes/anything-v4.5-pruned-fp16"
 print("Loading files")
 scheduler = DPMSolverMultistepScheduler.from_pretrained(
     model_id, subfolder="scheduler", safety_checker=None
 )
 pipeline = StableDiffusionPipeline.from_pretrained(
     model_id,
+    custom_pipeline="lpw_stable_diffusion",
     scheduler=scheduler,
     torch_dtype=torch.float16,
     safety_checker=None,
-    custom_pipeline="lpw_stable_diffusion",
 ).to(P_DEVICE)
+
+pipeline.load_textual_inversion("EasyNegative.safetensors")
+
 print("FIles loaded")
 # pipeline.scheduler = DPMSolverMultistepScheduler.from_config(
 #     pipeline.scheduler.config)

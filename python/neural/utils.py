@@ -16,7 +16,7 @@ PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 TOKENIZE_REGEX = r"[A-Za-z0-9!]+|[\"#$%&'()*+,\-.\/:;<=>?@\[\\\]^_`{|}~]+"
 ENTITIES_REGEX = r"<e-([a-z_]+)>(.+?)<\/e-\1>"
 EXTRACT_VARIATIONS_REGEX = r"\[(.*?)\]"
-MAX_MODEL_TOKENS = 256
+MAX_MODEL_TOKENS = 200
 
 
 def split_text(text: str) -> list[str]:
@@ -135,6 +135,8 @@ class Vocabulary:
     RESERVED_KEY_PAD = "[PAD]"
     RESERVED_KEY_WHITESPACE = "[WHITESPACE]"
     RESERVED_VOCAB = {RESERVED_KEY_WHITESPACE: 0, RESERVED_KEY_PAD: 1}
+    MIN_FREQUENCY = 5
+    LOWERCASE_ONLY = True
 
     def __init__(self, initial={}) -> None:
         self.last_new_index = max(initial.values()) + 1
@@ -191,10 +193,11 @@ class Vocabulary:
     def to_vocab(texts: list[str], max_size=300):
         all_chars = list()
 
-        def to_chars(sen):
+        def to_chars(sen: str):
             nonlocal all_chars
-            chars = []
-            for x in split_text(sen):
+            chars: list[str] = []
+            full_sen = sen.lower() if Vocabulary.LOWERCASE_ONLY else sen
+            for x in split_text(full_sen):
                 char = [y for y in x]
                 all_chars.extend(char)
                 chars.append(char)
@@ -208,16 +211,21 @@ class Vocabulary:
                 all_chars
                 + [x for x in string.punctuation]
                 + [x for x in string.digits]
-                + [x for x in string.ascii_uppercase]
+                # + [x for x in string.ascii_uppercase]
                 + [x for x in string.ascii_lowercase]
             )
         )
+
         new_vocab = sorted(new_vocab)
+
         cur_vocab_size = len(new_vocab) + len(Vocabulary.RESERVED_VOCAB.keys())
+
         ignore_list = set()
+
         while cur_vocab_size < max_size:
             most_freq, freq = Vocabulary.get_most_freq_pair(data, ignore_list)
-            if freq == 0:
+
+            if freq == 0 or freq < Vocabulary.MIN_FREQUENCY:
                 break
             if most_freq in new_vocab:
                 ignore_list.add(most_freq)
@@ -272,13 +280,19 @@ class Vocabulary:
         self, text: str, max_tokens: int = MAX_MODEL_TOKENS, pad=False
     ) -> list[int]:
         tokens = []
-        for word in text.split():
+        for word in (text.lower() if Vocabulary.LOWERCASE_ONLY else text).split():
             word_tokens = []
             for word_section in split_text(word):
                 word_tokens.extend(self.compute_word_tokens(word_section))
             if len(tokens) > 0:
                 tokens.append(self.vocab[Vocabulary.RESERVED_KEY_WHITESPACE])
             tokens.extend(word_tokens)
+
+        print(
+            "Tokenized |", text, "| Into |", tokens, file=open("vocab debug.txt", "w")
+        )
+        if len(tokens) > max_tokens:
+            print(f"Truncating {len(tokens) - max_tokens} tokens")
 
         if len(tokens) < max_tokens and pad:
             tokens = tokens + [

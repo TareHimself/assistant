@@ -2,6 +2,8 @@ import { AssistantContext, AssistantPlugin } from '@core/assistant';
 import { Client, WebRequest } from 'express-websocket-proxy';
 import axios from 'axios';
 import FormData from 'form-data';
+import { v4 as uuidv4 } from 'uuid';
+import { CgasApi } from '@core/singletons';
 export type TelegramChat = {
 	id: number;
 	title?: string;
@@ -102,7 +104,20 @@ class TelegramContext extends AssistantContext {
 		);
 		return true;
 	}
-	override async replyImage(data: Buffer): Promise<boolean> {
+	override async replyImage(data: Buffer | string): Promise<boolean> {
+		let data_uri = data;
+
+		if (typeof data_uri !== 'string') {
+			const upload = (await CgasApi.get().upload(uuidv4() + '.png', data_uri))
+				?.url;
+			if (upload === undefined) {
+				return false;
+			}
+
+			data_uri = upload;
+		}
+
+		return await this.reply(data_uri);
 		const formData = new FormData();
 		formData.append('photo', data, 'image.png');
 		formData.append('chat_id', this.data.chat.id);

@@ -72,7 +72,7 @@ export class SimpleIntentClassifier extends IntentClassifier {
 		const dataRecieved = JSON.parse(
 			nluPacket.toString()
 		) as ISimpleClassificationResult;
-		console.log(dataRecieved);
+		console.info(prompt, dataRecieved);
 		const targetIntent = dataRecieved[0];
 		if (targetIntent.confidence < this.minConfidence) {
 			return {

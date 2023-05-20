@@ -100,7 +100,7 @@ class IntentsNeuralNet(nn.Module):
         self.device = torch.device("cpu")
         self.em = nn.EmbeddingBag(len(self.vocab), self.e_dim, sparse=False)
         self.lstm = nn.LSTM(
-            input_size=self.e_dim, hidden_size=self.h_size, num_layers=2, dropout=0.5
+            input_size=self.e_dim, hidden_size=self.h_size, num_layers=4, dropout=0.5
         )
         self.fc1 = nn.Linear(self.h_size, len(self.classes))
 

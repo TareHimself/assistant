@@ -57,7 +57,11 @@ class DiscordContext extends AssistantContext {
 		return true;
 	}
 
-	override async replyImage(data: Buffer): Promise<boolean> {
+	override async replyImage(data: Buffer | string): Promise<boolean> {
+		if (typeof data === 'string') {
+			return await this.reply(data);
+		}
+
 		await this.data.message.reply({
 			files: [
 				{

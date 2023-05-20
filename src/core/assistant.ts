@@ -507,7 +507,7 @@ export abstract class AssistantContext extends LoadableWithId {
 		return false;
 	}
 
-	async replyImage(data: Buffer): Promise<boolean> {
+	async replyImage(data: Buffer | string): Promise<boolean> {
 		return false;
 	}
 }

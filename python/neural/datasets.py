@@ -36,17 +36,28 @@ class IntentsDataset(Dataset):
 
             all_entities.extend(list(entities))
 
-        self.words_vocab = Vocabulary.to_vocab(all_words, 600)
+        self.words_vocab = Vocabulary.to_vocab(all_words, 3000)
         # self.entities_vocab.add(all_entities)
         all_words = []
         all_entities = []
 
         for i in range(len(self.train_examples)):
+            # print(
+            #     self.tags[self.train_labels[i]], " | ", " ".join(self.train_examples[i])
+            # )
             self.train_examples[i] = np.array(
                 self.words_vocab(" ".join(self.train_examples[i]), pad=True)
             )
             self.train_entities[i] = np.array([0])
 
+        # balance = {}
+        # for tag in self.train_labels:
+        #     if self.tags[tag] not in balance.keys():
+        #         balance[self.tags[tag]] = 1
+        #     else:
+        #         balance[self.tags[tag]] += 1
+
+        # print("TAGS BALANCE", balance)
         # for i in range(len(self.train_entities)):
         #     self.train_entities[i] = np.array(
         #         self.entities_vocab(self.train_entities[i], max_tokens)
