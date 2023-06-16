@@ -1,55 +1,40 @@
-import {
-	AssistantPlugin,
-	AssistantSkill,
-	SkillInstance,
-} from '@core/assistant';
-import { IIntent } from '@core/types';
-
-class LightsControlOn extends AssistantSkill {
-	override get intents() {
-		return [
-			{
-				tag: 'lights_on',
-				description: 'turns on lights',
-				entities: [],
-				examples: [
-					'[T|t]urn on the lights',
-					'[L|l]ights on',
-					'[L|l]ights',
-					'[L|l]et there be light',
-				],
-			},
-		];
-	}
-
-	override async execute(instance: SkillInstance): Promise<void> {
-		instance.context.reply('Turned on the lights');
-	}
-}
-
-class LightsControlOff extends AssistantSkill {
-	override get intents() {
-		return [
-			{
-				tag: 'lights_off',
-				description: 'turns off lights',
-				entities: [],
-				examples: ['[T|t]urn off the lights', '[L|l]ights off'],
-			},
-		];
-	}
-
-	override async execute(instance: SkillInstance): Promise<void> {
-		instance.context.reply('Turned off the lights');
-	}
-}
+import { AssistantPlugin } from '@core/assistant';
+import axios from 'axios';
+import { GooveApiResponse, IGooveDevice, IGooveDeviceRaw } from './types';
 
 export default class GoveePlugin extends AssistantPlugin {
+	devices: Map<string, IGooveDevice> = new Map();
+	rest = axios.create({
+		baseURL: `https://developer-api.govee.com/v1/`,
+		headers: {
+			'Govee-API-Key': process.env.GOOVE_API_KEY,
+		},
+	});
+
 	override get id(): string {
 		return 'govee-plugin';
 	}
 
-	override async getSkills(): Promise<AssistantSkill[]> {
-		return [new LightsControlOn(), new LightsControlOff()];
+	override async beginLoad(): Promise<void> {
+		const allDevicesResponse = await this.rest
+			.get<GooveApiResponse<{ devices: IGooveDeviceRaw[] }>>('devices')
+			.catch(console.error);
+		if (allDevicesResponse) {
+			allDevicesResponse.data.data.devices.forEach((d) => {
+				if (d.controllable && d.retrievable) {
+					this.devices.set(d.device, {
+						device: d.device,
+						model: d.model,
+						name: d.deviceName,
+						supportedCommands: d.supportCmds,
+						properties: d.properties,
+					});
+				}
+			});
+		}
+	}
+
+	override get dirname() {
+		return __dirname;
 	}
 }

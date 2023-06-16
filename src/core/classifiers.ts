@@ -2,11 +2,12 @@ import axios, { AxiosInstance } from 'axios';
 import { ELoadableState, EntityExtractionError, Loadable } from './base';
 import { IIntent, IIntentInferenceResult } from './types';
 import { PythonProcess } from './subprocess';
+import { writeFileSync } from 'fs';
 
 export abstract class IntentClassifier extends Loadable {
 	async classify(
 		prompt: string,
-		intents: IIntent[]
+		intents?: IIntent[]
 	): Promise<IIntentInferenceResult> {
 		throw new Error('This classifier is not functional');
 	}
@@ -15,37 +16,42 @@ export abstract class IntentClassifier extends Loadable {
 }
 
 export type ISimpleClassificationResult = {
-	intent: string;
-	confidence: number;
-}[];
+	intents: { intent: string; confidence: number }[];
+	entities: [string, string][];
+};
+
 export class SimpleIntentClassifier extends IntentClassifier {
 	intentsStringified: string = '';
 	intentsIndex: Record<string, IIntent> = {};
 	classifierProcess = new PythonProcess('intents.py');
 	saveDir: string;
 	minConfidence: number;
-	constructor(savePath: string, confidenceThreshold = 0.6) {
+	constructor(saveDir: string, confidenceThreshold = 0.6) {
 		super();
-		this.saveDir = savePath;
+		this.saveDir = saveDir;
 		this.minConfidence = confidenceThreshold;
 	}
 
-	override async onLoad(): Promise<void> {
+	override async beginLoad(): Promise<void> {
 		await this.classifierProcess.waitForState(ELoadableState.ACTIVE);
 	}
 
 	override async train(intents: IIntent[]) {
 		await this.classifierProcess.sendAndWait(
 			Buffer.from(
-				JSON.stringify({
-					tags: intents.map((a) => {
-						return {
-							tag: a.tag,
-							examples: a.examples,
-						};
-					}),
-					model: this.saveDir,
-				})
+				JSON.stringify(
+					{
+						tags: intents.map((a) => {
+							return {
+								tag: a.tag,
+								examples: a.examples,
+							};
+						}),
+						dir: this.saveDir,
+					},
+					null,
+					4
+				)
 			),
 			2
 		);
@@ -59,10 +65,12 @@ export class SimpleIntentClassifier extends IntentClassifier {
 
 	override async classify(
 		prompt: string,
-		intents: IIntent[]
+		intents?: IIntent[]
 	): Promise<IIntentInferenceResult> {
-		if (this.intentsStringified !== intents.toString()) {
-			await this.train(intents);
+		if (intents) {
+			if (this.intentsStringified !== intents.toString()) {
+				await this.train(intents);
+			}
 		}
 
 		const [_, nluPacket] = await this.classifierProcess.sendAndWait(
@@ -73,7 +81,7 @@ export class SimpleIntentClassifier extends IntentClassifier {
 			nluPacket.toString()
 		) as ISimpleClassificationResult;
 		console.info(prompt, dataRecieved);
-		const targetIntent = dataRecieved[0];
+		const targetIntent = dataRecieved.intents[0];
 		if (targetIntent.confidence < this.minConfidence) {
 			return {
 				intent: 'none',
@@ -122,8 +130,11 @@ export class OpenAi extends IntentClassifier {
 	}
 	override async classify(
 		prompt: string,
-		intents: IIntent[]
+		intents?: IIntent[]
 	): Promise<IIntentInferenceResult> {
+		if (!intents) {
+			throw new Error('Intents param is required for this classifier');
+		}
 		const openAiPrompt = `POSSIBLE_INTENTS_FORMAT: intent - entities if present
 		POSSIBLE_INTENTS:
 		s_none(no valid intent)
@@ -152,7 +163,7 @@ export class OpenAi extends IntentClassifier {
 			.map((a) => a.trim())
 			.join('\n');
 
-		console.log(openAiPrompt);
+		console.info(openAiPrompt);
 		return {
 			intent: 'skill_none',
 			entities: [],

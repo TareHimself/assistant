@@ -38,7 +38,7 @@ export class CgasApi extends AssistantObject {
 			);
 			return uploadResponse.data;
 		} catch (error) {
-			console.log(error);
+			console.error(error);
 		}
 		return null;
 	}

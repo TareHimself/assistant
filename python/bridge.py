@@ -4,7 +4,7 @@ import os
 from typing import Callable
 import json
 from queue import Queue
-from threading import Thread
+from threading import Thread, get_ident
 
 NO_REQUIRED_PARAMS = 4
 SERVER_PORT, PACKET_HEADER_DELIM, PACKET_START_DELIM, PACKET_END_DELIM = sys.argv[
@@ -90,7 +90,12 @@ def process_packet(
 
 class Bridge:
     def __init__(self) -> None:
+        print(
+            get_ident(),
+            file=open("t0.txt", "w"),
+        )
         self.stop = False
+        self.to_main_queue = Queue()
         self.callbacks = []
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect(("127.0.0.1", SERVER_PORT))
@@ -99,6 +104,14 @@ class Bridge:
 
     def ready(self):
         self.send("READY".encode("utf-8"), -1)
+        while True:
+            try:
+                header, data = self.to_main_queue.get()
+                for callback in self.callbacks:
+                    callback(header["op"], data)
+
+            except KeyboardInterrupt:
+                break
 
     def _run_tcp(self):
         pendingData = b""
@@ -131,8 +144,7 @@ class Bridge:
         packet_data = packet[
             header_delim_index + len(PACKET_HEADER_DELIM) : len(packet)
         ]
-        for callback in self.callbacks:
-            callback(packet_header["op"], packet_data)
+        self.to_main_queue.put((packet_header, packet_data))
 
     def add_on_packet(self, callback: Callable[[int, bytes], None]):
         self.callbacks.append(callback)

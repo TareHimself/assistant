@@ -1,20 +1,25 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from neural.datasets import IntentsDataset
-from neural.model import IntentsNeuralNet, TokenClassificationNet
+from neural.model import IntentsNeuralNet, NERModel
+from neural.datasets import IntentsDataset, NERDataset
 from torch.utils.data import DataLoader
 from os import path
-from neural.utils import hash_intents, expand_all_examples, PYTORCH_DEVICE
+from neural.utils import (
+    hash_intents,
+    expand_all_examples,
+    PYTORCH_DEVICE,
+    DISTIL_BERT_MODEL,
+)
 from tqdm import tqdm
+from copy import deepcopy
 
 
 def train_intents(
     intents: list,
     save_path: str,
-    batch_size=32,
-    learning_rate=0.0001,
-    epochs=3000,
+    learning_rate=5e-5,
+    epochs=4,
     patience=30,
 ):
     expand_all_examples(intents)
@@ -51,35 +56,28 @@ def train_intents(
     #     return label_lst, review_lst, offset_lst
 
     train_loader = DataLoader(
-        dataset=dataset, batch_size=batch_size, num_workers=0, shuffle=True
+        dataset=dataset, batch_size=16, num_workers=0, shuffle=True
     )
 
-    embed_dim = 300
-    hidden_size = 256
     print("device" + PYTORCH_DEVICE.__str__())
-    model = IntentsNeuralNet(
-        dataset.words_vocab, embed_dim, hidden_size, dataset.tags
-    ).to_device(PYTORCH_DEVICE)
+    model = IntentsNeuralNet(dataset.tags).to(PYTORCH_DEVICE)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
     loading_bar = tqdm(
-        total=epochs, desc=f"epoch {0}/{epochs} ::  Accuracy unknown :: loss unknown"
+        total=epochs, desc=f"epoch {1}/{epochs} ::  Accuracy unknown :: loss unknown"
     )
 
-    best_weights = None
-    best_loss = 999999
-    no_improvement_counter = 0
     for epoch in range(epochs):
         total_accu, total_count = 0, 0
         total_loss, loss_count = 0, 0
         for idx, data in enumerate(train_loader):
-            label, text, _ = data
+            label, input_ids, attention_masks = data
             label = label.to(PYTORCH_DEVICE)
-            text = text.to(PYTORCH_DEVICE)
+            input_ids = input_ids.to(PYTORCH_DEVICE)
+            attention_masks = attention_masks.to(PYTORCH_DEVICE)
             # print(label, text)
 
-            outputs = model(text)
+            outputs = model(input_ids, attention_masks)
 
             loss = criterion(outputs, label)
 
@@ -93,25 +91,20 @@ def train_intents(
 
         accu_val = total_accu / total_count
         loss_val = total_loss / loss_count
-        if loss_val < best_loss:
-            best_loss = loss_val
-            best_weights = model.state_dict()
-            no_improvement_counter = 0
-        no_improvement_counter += 1
-        if no_improvement_counter == patience:
-            loading_bar.close()
-            print("Stopping due to no improvement")
-            break
         loading_bar.update()
         loading_bar.set_description_str(
             f"epoch {epoch + 1}/{epochs} ::  Accuracy {(accu_val * 100):.4f} :: loss {loss_val:.4f}"
         )
 
-    model.save(best_weights, intents_hash, save_path)
+    model.save(intents_hash, save_path)
 
 
-def train_entities(
-    intents: list, save_path: str, batch_size=64, learning_rate=1e-4, epochs=200
+def train_ner(
+    intents: list,
+    save_path: str,
+    learning_rate=5e-5,
+    epochs=90,
+    patience=30,
 ):
     expand_all_examples(intents)
     intents_hash = hash_intents(intents)
@@ -121,14 +114,16 @@ def train_entities(
             print("No need to train new model, loading existing")
             return
 
-    dataset = IntentsDataset(intents)
+    print("Training new model")
+
+    dataset = NERDataset(intents)
 
     # def collate_data(batch):
     #     nonlocal dataset
     #     # rearrange a batch and compute offsets too
     #     # needs a global vocab and tokenizer
     #     label_lst, review_lst, offset_lst = [], [], [0]
-    #     for (_lbl, _rvw) in batch:
+    #     for _lbl, _rvw in batch:
     #         label_lst.append(int(_lbl))  # string to int
     #         idxs = []
     #         for tok in _rvw:
@@ -138,67 +133,59 @@ def train_entities(
     #         review_lst.append(idxs)
     #         offset_lst.append(len(idxs))
 
-    #     label_lst = torch.tensor(
-    #         label_lst, dtype=torch.int64).to(PYTORCH_DEVICE)
-    #     offset_lst = torch.tensor(
-    #         offset_lst[:-1]).cumsum(dim=0).to(PYTORCH_DEVICE)
+    #     label_lst = torch.tensor(label_lst, dtype=torch.int64).to(PYTORCH_DEVICE)
+    #     offset_lst = torch.tensor(offset_lst[:-1]).cumsum(dim=0).to(PYTORCH_DEVICE)
     #     review_lst = torch.cat(review_lst).to(PYTORCH_DEVICE)  # 2 tensors to 1
 
     #     return label_lst, review_lst, offset_lst
 
     train_loader = DataLoader(
-        dataset=dataset, batch_size=batch_size, num_workers=0, shuffle=True
+        dataset=dataset, batch_size=3, num_workers=0, shuffle=True
     )
 
-    input_size = len(dataset.words_vocab)
-    embed_dim = 300
-    hidden_size = 512
-    output_size = len(dataset.entities_vocab)
     print("device" + PYTORCH_DEVICE.__str__())
-    model = TokenClassificationNet(input_size, embed_dim, hidden_size, output_size).to(
-        PYTORCH_DEVICE
-    )
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
+    model = NERModel(dataset.possible_entities).to(PYTORCH_DEVICE)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
     loading_bar = tqdm(
-        total=epochs, desc=f"epoch {0}/{epochs} ::  Accuracy unknown :: loss unknown"
+        total=epochs, desc=f"epoch {1}/{epochs} ::  Accuracy unknown :: loss unknown"
     )
-    best_weights = None
-    best_loss = 999999
+    best_weights = deepcopy(model.state_dict())
+    best_loss = 99999999
     for epoch in range(epochs):
+        total_accu, total_count = 0, 0
+        total_loss, loss_count = 0, 0
         for idx, data in enumerate(train_loader):
-            label, text, entities = data
-            entities = entities.type(torch.LongTensor).to(PYTORCH_DEVICE)
-            text = text.type(torch.LongTensor).to(PYTORCH_DEVICE)
+            label, input_ids, attention_masks = data
+            label = label.type(torch.LongTensor).to(PYTORCH_DEVICE)
+            input_ids = input_ids.to(PYTORCH_DEVICE)
+            attention_masks = attention_masks.to(PYTORCH_DEVICE)
             # print(label, text)
 
-            outputs = model(text)
-            loss = criterion(outputs.view(-1, outputs.size(-1)), entities.view(-1))
+            loss, logits = model(input_ids, attention_masks, label)
 
-            optimizer.zero_grad()
+            for i in range(logits.shape[0]):
+                logits_clean = logits[i][label[i] != -100]
+                label_clean = label[i][label[i] != -100]
+
+                predictions = logits_clean.argmax(dim=1)
+                acc = (predictions == label_clean).sum()
+                total_accu += acc
+                total_count += predictions.size(0)
+                loss_count += label.size(0)
+                total_loss += loss.item()
+
             loss.backward()
             optimizer.step()
-            # Compute and return accuracy
-            total_accu += (
-                outputs.argmax(dim=2) == entities
-            ).sum().item() / entities.flatten().shape[0]
-            total_count += entities.size(0)
-            loss_count += 1
-            total_loss += loss.item()
 
+        accu_val = total_accu / total_count
+        loss_val = total_loss / loss_count
         loading_bar.update()
         loading_bar.set_description_str(
-            f"epoch {epoch + 1}/{epochs} ::  Accuracy {(accu_val * 100):.4f} :: loss {(loss_val):.4f}"
+            f"epoch {epoch + 1}/{epochs} ::  Accuracy {(accu_val * 100):.4f} :: loss {loss_val:.4f}"
         )
 
-    data_to_save = {
-        "state": model.state_dict(),
-        "input": input_size,
-        "e_dim": embed_dim,
-        "hidden": hidden_size,
-        "vocab": dataset.entities_vocab.vocab,
-        "hash": intents_hash,
-    }
+        if total_loss < best_loss:
+            best_weights = deepcopy(model.state_dict())
+            best_loss = total_loss
 
-    torch.save(data_to_save, save_path)
+    model.save(intents_hash, save_path)

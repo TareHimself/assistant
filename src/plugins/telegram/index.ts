@@ -4,46 +4,7 @@ import axios from 'axios';
 import FormData from 'form-data';
 import { v4 as uuidv4 } from 'uuid';
 import { CgasApi } from '@core/singletons';
-export type TelegramChat = {
-	id: number;
-	title?: string;
-	first_name?: string;
-	type: string;
-};
-
-export type TelegramMessage = {
-	message_id: number;
-	from?: {
-		id: number;
-		is_bot: boolean;
-		first_name: string;
-		language_code: string;
-	};
-	sender_chat?: TelegramChat;
-	chat: TelegramChat;
-	date: number;
-	text?: string;
-	photo?: any[];
-	has_protected_content?: boolean;
-};
-export interface ITelegramMessageInfo {
-	update_id: number;
-	message?: TelegramMessage & {
-		from: {
-			id: number;
-			is_bot: boolean;
-			first_name: string;
-			language_code: string;
-		};
-	};
-	channel_post?: TelegramMessage & { sender_chat: TelegramChat };
-}
-
-export interface ITelegramContextPayload {
-	chat: TelegramChat;
-	text?: string;
-	userId: number;
-}
+import { ITelegramMessageInfo, ITelegramContextPayload } from './types';
 
 function messageInfoToPayload(
 	data: ITelegramMessageInfo
@@ -118,20 +79,6 @@ class TelegramContext extends AssistantContext {
 		}
 
 		return await this.reply(data_uri);
-		const formData = new FormData();
-		formData.append('photo', data, 'image.png');
-		formData.append('chat_id', this.data.chat.id);
-		await axios.post(
-			`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendPhoto`,
-			formData,
-			{
-				headers: {
-					'Content-Type': 'multipart/form-data',
-					...formData.getHeaders(),
-				},
-			}
-		);
-		return true;
 	}
 }
 
@@ -143,7 +90,7 @@ export default class TelegramPlugin extends AssistantPlugin {
 	pendingUserInputs: {
 		[key: string]: (message: ITelegramContextPayload) => void;
 	} = {};
-	override async onLoad(): Promise<void> {
+	override async beginLoad(): Promise<void> {
 		this.proxy.post('/telegram/webhook', (req) => {
 			req.sendStatus(200);
 
@@ -168,5 +115,9 @@ export default class TelegramPlugin extends AssistantPlugin {
 			}
 		});
 		this.proxy.connect();
+	}
+
+	override get dirname() {
+		return __dirname;
 	}
 }

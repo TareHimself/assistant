@@ -84,5 +84,3 @@ audio = AudioStream(
 audio.start()
 
 testSocket.ready()
-while True:
-    time.sleep(10)

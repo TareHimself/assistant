@@ -11,7 +11,7 @@ from sys import argv
 import time
 import torch
 import sounddevice as sd
-from os import path
+import os
 from bridge import Bridge, debug
 from neural.utils import PYTORCH_DEVICE
 
@@ -56,9 +56,13 @@ def load_model(model_id: str):
         scheduler=DPMSolverMultistepScheduler.from_pretrained(
             model_id, subfolder="scheduler"
         ),
+        custom_pipeline="lpw_stable_diffusion",
         torch_dtype=torch.float16,
         safety_checker=None,
     ).to(PYTORCH_DEVICE)
+    pipeline.load_textual_inversion(
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), "EasyNegative.pt")
+    )
     try:
         import xformers
 
@@ -70,11 +74,11 @@ def load_model(model_id: str):
     return pipeline
 
 
-NEGATIVE_PROMPT = "lowres, ((bad anatomy)), ((bad hands)), text, missing finger, extra digits, fewer digits, blurry, ((mutated hands and fingers)), (poorly drawn face), ((mutation)), ((deformed face)), (ugly), ((bad proportions)), ((extra limbs)), extra face, (double head), (extra head), ((extra feet)), monster, logo, cropped, worst quality, low quality, normal quality, jpeg, humpbacked, long body, long neck, ((jpeg artifacts)), EasyNegative"
+# NEGATIVE_PROMPT = "lowres, ((bad anatomy)), ((bad hands)), text, missing finger, extra digits, fewer digits, blurry, ((mutated hands and fingers)), (poorly drawn face), ((mutation)), ((deformed face)), (ugly), ((bad proportions)), ((extra limbs)), extra face, (double head), (extra head), ((extra feet)), monster, logo, cropped, worst quality, low quality, normal quality, jpeg, humpbacked, long body, long neck, ((jpeg artifacts)), EasyNegative"
+NEGATIVE_PROMPT = "((EasyNegative)) , lowres , ((bad anatomy)), ((bad hands)), missing finger, extra digits, fewer digits, blurry, ((mutated hands and fingers)), (poorly drawn face), ((mutation)), ((deformed face)), (ugly), ((bad proportions)), ((extra limbs)), extra face, (double head), (extra head), ((extra feet)), monster, cropped, worst quality, low quality, normal quality, jpeg, humpbacked, long body, long neck, ((jpeg artifacts))"
 
 
 def on_packet(op, packet: bytes):
-    global pipeline_pastel
     global main_process
 
     data = json.loads(packet.decode())
@@ -104,7 +108,7 @@ def on_packet(op, packet: bytes):
     debug(json.dumps(main_params).encode())
     with torch.inference_mode():
         debug(b"Generating")
-        image = pipe(
+        image = pipe.text2img(
             prompt,
             negative_prompt=NEGATIVE_PROMPT,
             num_inference_steps=steps,
@@ -112,6 +116,7 @@ def on_packet(op, packet: bytes):
             width=width,
             guidance_scale=guidance,
             generator=seed,
+            max_embeddings_multiples=4,
         ).images[0]
         debug(b"Done Generating")
         output = io.BytesIO()
@@ -122,6 +127,3 @@ def on_packet(op, packet: bytes):
 main_process.add_on_packet(on_packet)
 
 main_process.ready()
-
-while True:
-    time.sleep(10)

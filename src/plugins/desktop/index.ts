@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import { BrowserWindow } from 'electron';
 import { digitsToWords } from '@core/conversion';
 import { CgasApi } from '@core/singletons';
+
 export class DesktopContext extends AssistantContext {
 	plugin: DesktopPlugin;
 
@@ -23,7 +24,7 @@ export class DesktopContext extends AssistantContext {
 		return this.id + '-user';
 	}
 
-	override async onLoad() {}
+	override async beginLoad() {}
 
 	override async reply(data: string): Promise<boolean> {
 		let final = data + (data.endsWith('.') ? '' : '.');
@@ -94,7 +95,7 @@ export default class DesktopPlugin extends AssistantPlugin {
 		return 'desktop';
 	}
 
-	override async onLoad(): Promise<void> {
+	override async beginLoad(): Promise<void> {
 		await this.stt.waitForState(ELoadableState.ACTIVE);
 		await this.tts.waitForState(ELoadableState.ACTIVE);
 
@@ -109,5 +110,9 @@ export default class DesktopPlugin extends AssistantPlugin {
 
 			this.assistant.tryStartSkill(pack.toString(), new DesktopContext(this));
 		});
+	}
+
+	override get dirname() {
+		return __dirname;
 	}
 }

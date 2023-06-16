@@ -5,8 +5,7 @@ async function main() {
 	const client = new Client();
 	const StreamClient = new DiscordStreamClient(client);
 
-	const token =
-		'ODc1MTE2NTI4NDgyMjYzMDYw.GApxt2.Av90e8CY9tIAvgVEIx1L1EWNJsCBKugzjX9Dtw'; //'';
+	const token = '';
 
 	client.login(token);
 

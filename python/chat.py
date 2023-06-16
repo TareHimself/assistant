@@ -1,44 +1,36 @@
 from bridge import Bridge
 import time
-import sys
-import asyncio
 from random import choice
-from transformers import pipeline
-from neural.utils import PYTORCH_DEVICE
+import json
+from gpt4all import GPT4All
+from threading import get_ident
 
-# generator = pipeline(
-#     "text-generation",
-#     model="PygmalionAI/pygmalion-1.3b",
-#     device=PYTORCH_DEVICE,  # "cpu"
-# )
-
-# persona = """Alice's Persona: An assistant built with NodeJS.
-# <START>
-# """
-
-
-# def generate(content: str) -> str:
-#     global persona
-
-#     prompt = persona + content + "\nAlice:"
-#     #
-#     generated = generator(prompt, max_length=len(prompt) + 15, num_return_sequences=1)[
-#         0
-#     ]["generated_text"]
-#     return generated[len(prompt) : len(generated)].split("\n")[0].strip()
+model = GPT4All("ggml-wizard-13b-uncensored")
 
 
 process_bridge = Bridge()
 
 
-# def on_packet(op: int, packet: bytes):
-#     global process_bridge
-#     response = generate(packet.decode())
-#     process_bridge.send(response.encode(), op)
+def on_packet(op: int, packet: bytes):
+    global model
+    print(packet.decode(), file=open("latest_prompt.txt", "w"))
+    response = model.model.prompt_model(
+        "You are a virtual assistant named Alice. Generate one response for ASSISTANT\n"
+        + packet.decode(),
+        temp=0.8,
+        top_p=0.95,
+        top_k=40,
+        repeat_penalty=1.1,
+        repeat_last_n=64,
+        n_batch=9,
+        n_ctx=512,
+        n_predict=1024,
+        streaming=False,
+    )
+
+    process_bridge.send(response.encode(), op)
 
 
-# process_bridge.add_on_packet(on_packet)
+process_bridge.add_on_packet(on_packet)
 
 process_bridge.ready()
-while True:
-    time.sleep(10)

@@ -1,5 +1,4 @@
 import { Assistant, AssistantContext, AssistantPlugin } from '@core/assistant';
-import { getInfo } from 'ytdl-core';
 import { Client, Message } from 'discord.js-selfbot-v13';
 import {
 	NoSubscriberBehavior,
@@ -83,7 +82,7 @@ export default class DiscordPlugin extends AssistantPlugin {
 
 	async tryClassify(prompt: string) {}
 
-	override async onLoad(): Promise<void> {
+	override async beginLoad(): Promise<void> {
 		// const { DiscordStreamClient } = await eval(
 		// 	`import('discord-stream-client')`
 		// );
@@ -164,5 +163,9 @@ export default class DiscordPlugin extends AssistantPlugin {
 
 	override get id(): string {
 		return 'discord-plugin';
+	}
+
+	override get dirname() {
+		return __dirname;
 	}
 }

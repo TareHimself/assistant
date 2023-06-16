@@ -3,7 +3,31 @@ import re
 import torch
 import string
 from numwrd import num2wrd
+from transformers import DistilBertTokenizerFast, BertTokenizerFast
 
+TOKENIZER_LENGTH = 8 * 40
+
+DISTIL_BERT_MODEL = "distilbert-base-cased"
+DISTIL_BERT_TOKENIZER = DistilBertTokenizerFast.from_pretrained(DISTIL_BERT_MODEL)
+DISTIL_BERT_TOKENIZER_FUNCTION = lambda a: DISTIL_BERT_TOKENIZER(
+    a,
+    padding="max_length",
+    max_length=TOKENIZER_LENGTH,
+    return_attention_mask=True,
+    truncation=True,
+    return_tensors="pt",
+)
+
+BERT_MODEL = "bert-base-cased"
+BERT_TOKENIZER = BertTokenizerFast.from_pretrained(BERT_MODEL)
+BERT_TOKENIZER_FUNCTION = lambda a: BERT_TOKENIZER(
+    a,
+    padding="max_length",
+    max_length=TOKENIZER_LENGTH,
+    return_attention_mask=True,
+    truncation=True,
+    return_tensors="pt",
+)
 
 PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # PYTORCH_DEVICE = torch.device(
@@ -13,10 +37,10 @@ PYTORCH_DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #     if torch.backends.mps.is_available()
 #     else "cpu"
 # )
-TOKENIZE_REGEX = r"[A-Za-z0-9!]+|[\"#$%&'()*+,\-.\/:;<=>?@\[\\\]^_`{|}~]+"
+TOKENIZE_REGEX = r"\b\w+\b|[\W]"
 ENTITIES_REGEX = r"<e-([a-z_]+)>(.+?)<\/e-\1>"
 EXTRACT_VARIATIONS_REGEX = r"\[(.*?)\]"
-MAX_MODEL_TOKENS = 200
+MAX_MODEL_TOKENS = 256
 
 
 def split_text(text: str) -> list[str]:
@@ -114,13 +138,11 @@ def expand_all_examples(intents: list):
 
 
 def hash_intents(intents: list):
-    final_string = ""
-    for intent in intents:
-        tag = intent["tag"]
-        for example in intent["examples"]:
-            final_string += f'{tag.replace(" ", "")}{example.replace(" ", "")}'
+    all_examples = []
+    [all_examples.extend([x["tag"]] + x["examples"]) for x in intents]
+    all_examples.sort()
 
-    return hashlib.md5(final_string.encode()).hexdigest()
+    return hashlib.md5("".join(all_examples).encode()).hexdigest()
 
 
 def increase_size(items: list, target: int):
@@ -133,15 +155,23 @@ def increase_size(items: list, target: int):
 
 class Vocabulary:
     RESERVED_KEY_PAD = "[PAD]"
-    RESERVED_KEY_WHITESPACE = "[WHITESPACE]"
-    RESERVED_VOCAB = {RESERVED_KEY_WHITESPACE: 0, RESERVED_KEY_PAD: 1}
+    RESERVED_KEY_STOP = "[STOP]"
+    RESERVED_WHITESPACE = " "
+    RESERVED_VOCAB = {
+        RESERVED_KEY_STOP: 0,
+        RESERVED_KEY_PAD: 1,
+        RESERVED_WHITESPACE: 2,
+    }
+
     MIN_FREQUENCY = 5
     LOWERCASE_ONLY = True
 
     def __init__(self, initial={}) -> None:
         self.last_new_index = max(initial.values()) + 1
-        self.vocab = initial
+        self.vocab = {str(k): int(v) for k, v in initial.items()}
         self.inv_vocab = {v: k for k, v in self.vocab.items()}
+        self.tokens_lengths = list(set([0] + list(map(len, self.vocab.keys()))))
+        self.tokens_lengths.sort()
 
     @staticmethod
     def merge_pairs(item: str, text_chars: list[str]):
@@ -175,14 +205,22 @@ class Vocabulary:
         texts: list[list[list[str]]], ignore_list: set[str] = []
     ) -> tuple[str, int]:
         frequencies = {}
-        for sentences in texts:
-            for chars in sentences:
-                for i in range(len(chars) - 1):
-                    pair = "".join(chars[i : i + 2])
-                    if pair not in frequencies.keys():
-                        frequencies[pair] = 1
-                    else:
-                        frequencies[pair] += 1
+        # for sentences in texts:
+        #     for chars in sentences:
+        #         for i in range(len(chars) - 1):
+        #             pair = "".join(chars[i : i + 2])
+        #             if pair not in frequencies.keys():
+        #                 frequencies[pair] = 1
+        #             else:
+        #                 frequencies[pair] += 1
+        for sentence in texts:
+            for i in range(len(sentence) - 1):
+                pair = "".join(sentence[i : i + 2])
+                if pair not in frequencies.keys():
+                    frequencies[pair] = 1
+                else:
+                    frequencies[pair] += 1
+
         result = max(
             frequencies.items(), key=lambda a: a[1] if a[0] not in ignore_list else 0
         )
@@ -197,21 +235,29 @@ class Vocabulary:
             nonlocal all_chars
             chars: list[str] = []
             full_sen = sen.lower() if Vocabulary.LOWERCASE_ONLY else sen
-            for x in split_text(full_sen):
-                char = [y for y in x]
-                all_chars.extend(char)
-                chars.append(char)
+            for x in list(full_sen):
+                all_chars.extend(x)
+                chars.append(x)
             return chars
 
         data = texts.copy()
         data = [to_chars(x) for x in data]
 
+        # print(
+        #     "UNIQIE CHARACTERS",
+        #     list(set(all_chars)),
+        #     file=open("unique.txt", "w", encoding="utf-8"),
+        # )
         new_vocab = list(
             set(
                 all_chars
                 + [x for x in string.punctuation]
                 + [x for x in string.digits]
-                # + [x for x in string.ascii_uppercase]
+                + (
+                    []
+                    if Vocabulary.LOWERCASE_ONLY
+                    else [x for x in string.ascii_uppercase]
+                )
                 + [x for x in string.ascii_lowercase]
             )
         )
@@ -233,8 +279,8 @@ class Vocabulary:
             new_vocab.append(most_freq)
             cur_vocab_size += 1
             for x in range(len(data)):
-                for y in range(len(data[x])):
-                    data[x][y] = Vocabulary.merge_pairs(most_freq, data[x][y])
+                merged = Vocabulary.merge_pairs(most_freq, data[x])
+                data[x] = merged
         final_vocab = Vocabulary.RESERVED_VOCAB.copy()
         len_reserved = len(final_vocab)
         for i in range(len(new_vocab)):
@@ -255,42 +301,38 @@ class Vocabulary:
         return self.vocab.get(item, 1)
 
     def compute_word_tokens(self, word: str):
-        w_len = len(word)
         word_tokens = []
         word_left = word
         while len(word_left) > 0:
-            longest_match = None
-            longest_match_section = None
-            for i in reversed(range(w_len)):
-                test_section = word_left[0 : i + 1]
-                possible_match = self.vocab.get(test_section, None)
+            start_len = len(word_left)
+            start_index = len(self.tokens_lengths) - 1
+            if self.tokens_lengths[start_index] > len(word_left):
+                for i in reversed(range(len(self.tokens_lengths))):
+                    if self.tokens_lengths[i] <= start_index:
+                        start_index = i
+                        break
+            for i in reversed(self.tokens_lengths[0 : start_index + 1]):
+                section = str(word_left[0 : i + 1])
+
+                possible_match = self.vocab.get(section, None)
+
                 if possible_match is not None:
-                    longest_match = possible_match
-                    longest_match_section = test_section
+                    word_tokens.append(possible_match)
+                    word_left = word_left[i + 1 :]
                     break
-            if longest_match is not None:
-                word_tokens.append(longest_match)
-                word_left = word_left[len(longest_match_section) :]
-            else:
-                break
+
+            if start_len == len(word_left):
+                return word_tokens
 
         return word_tokens
 
     def __call__(
         self, text: str, max_tokens: int = MAX_MODEL_TOKENS, pad=False
     ) -> list[int]:
-        tokens = []
-        for word in (text.lower() if Vocabulary.LOWERCASE_ONLY else text).split():
-            word_tokens = []
-            for word_section in split_text(word):
-                word_tokens.extend(self.compute_word_tokens(word_section))
-            if len(tokens) > 0:
-                tokens.append(self.vocab[Vocabulary.RESERVED_KEY_WHITESPACE])
-            tokens.extend(word_tokens)
-
-        print(
-            "Tokenized |", text, "| Into |", tokens, file=open("vocab debug.txt", "w")
+        tokens = self.compute_word_tokens(
+            text.lower() if Vocabulary.LOWERCASE_ONLY else text
         )
+
         if len(tokens) > max_tokens:
             print(f"Truncating {len(tokens) - max_tokens} tokens")
 

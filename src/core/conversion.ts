@@ -129,7 +129,6 @@ export function wordsToDigits(words: string) {
 }
 
 export function digitToWord(digit: string | number) {
-	console.log('To convert', digit);
 	const digitAsString = typeof digit === 'string' ? digit : `${digit}`;
 	const indexes: string[] = [];
 
@@ -174,7 +173,6 @@ export function digitToWord(digit: string | number) {
 			const curStatement =
 				[start, middle, end, idx === indexes.length - 2 ? ',' : ''].join(' ') +
 				' ';
-			console.log(curStatement, current, exponent);
 			idx++;
 			return final + curStatement;
 		}, '')

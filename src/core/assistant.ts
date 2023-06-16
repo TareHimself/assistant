@@ -3,12 +3,11 @@ import {
 	ELoadableState,
 	Loadable,
 	LoadableWithId,
+	SkillExecutionError,
 } from './base';
 import { DATA_PATH, PLUGINS_PATH } from './paths';
-import { PythonProcess } from './subprocess';
 import {
 	Awaitable,
-	IClassificationResult,
 	IIntent,
 	IParsedEntity,
 	IPromptAnalysisResult,
@@ -25,7 +24,10 @@ import { IntentClassifier, SimpleIntentClassifier } from './classifiers';
 /**
  * The base class for all assistant skills.
  */
-export abstract class AssistantSkill extends Loadable {
+export abstract class AssistantSkill<
+	P extends AssistantPlugin = AssistantPlugin
+> extends Loadable {
+	plugin!: P;
 	constructor() {
 		super();
 	}
@@ -82,10 +84,13 @@ export class SkillInstance extends AssistantObject {
 			this.assistant.activeSkills.set(this.id, this);
 			await this.skill.execute(this);
 		} catch (error: any) {
-			this.context.reply(`There was an error [${error.message}]`);
+			if (error instanceof SkillExecutionError) {
+				this.context.reply(error.message);
+			} else {
+				this.context.reply(`There was an error [${error.message}]`);
+			}
 			console.error(
-				'Error while executing skill.',
-				`Instance Id [${this.id}]\n`,
+				`Error while executing skill with instance ID  [${this.id}]\n`,
 				error
 			);
 		}
@@ -96,9 +101,10 @@ export class SkillInstance extends AssistantObject {
 
 export interface IAssistantEvents {
 	onReady: [assistant: Assistant];
+	onSkillAdded: [skill: AssistantSkill];
 	onSkillActivate: [instanceId: string];
 	onSkillDeactivate: [instanceId: string];
-	onPluginAdded: [pluginId: string];
+	onPluginAdded: [plugin: AssistantPlugin];
 	onPluginReloaded: [pluginId: string];
 	onPluginRemoved: [pluginId: string];
 	onExpectingCommandStart: [];
@@ -135,6 +141,14 @@ export class Assistant extends Loadable {
 
 	// chat: ChatProcess = new ChatProcess();
 
+	get dataPath() {
+		return path.join(DATA_PATH, 'core');
+	}
+
+	get bIsExpectingCommand() {
+		return this.expectingCommandTimer !== null;
+	}
+
 	currentSkills: Map<string, AssistantSkill[]> = new Map();
 	plugins: Map<string, AssistantPlugin> = new Map();
 	bIsDoingSkill: boolean = false;
@@ -144,20 +158,11 @@ export class Assistant extends Loadable {
 	activeSkills: Map<string, SkillInstance> = new Map();
 	pluginQueue: [AssistantPlugin, (ref: AssistantPlugin) => void][] = [];
 	bIsInChatMode: boolean = false;
-	classifier: IntentClassifier = new SimpleIntentClassifier(
-		path.join(this.dataPath, 'intents.pt')
-	);
-
-	get dataPath() {
-		return path.join(DATA_PATH, 'core');
-	}
-
-	get bIsExpectingCommand() {
-		return this.expectingCommandTimer !== null;
-	}
+	skillClassifier: IntentClassifier = new SimpleIntentClassifier(this.dataPath);
+	chat = new ChatProcess();
 
 	static WAKE_WORD = 'alice';
-	static SKILL_START_CONFIDENCE = 0.5;
+	static SKILL_START_CONFIDENCE = 0.9;
 	static EXPECTING_COMMAND_TIMER = 1000 * 20;
 	constructor() {
 		super();
@@ -165,13 +170,15 @@ export class Assistant extends Loadable {
 			this.emit('onReady', this);
 		});
 		console.info('Loading assistant');
-		this.load().catch((error) => {
-			console.error(error);
-			process.exit();
-		});
+		this.load()
+			.catch((error) => {
+				console.error(error);
+				process.exit();
+			})
+			.then(() => this.emit('onReady', this));
 	}
 
-	override async onLoad() {
+	override async beginLoad() {
 		if (!fsSync.existsSync(this.dataPath)) {
 			await fs.mkdir(this.dataPath, {
 				recursive: true,
@@ -216,12 +223,45 @@ export class Assistant extends Loadable {
 		);
 		console.info('Plugins loaded');
 		console.info('Loading Intent classifier');
-		await this.classifier.load();
+		await this.skillClassifier.load();
 		console.info('Intent classifier loaded');
 		console.info('Training Intent classifier');
-		await this.classifier.train(Object.values(this.intents));
+		await this.skillClassifier.train(Object.values(this.intents));
 		console.info('Intent classifier trained');
+		console.info('Loading chat process');
+		await this.chat.load();
+		console.info('Chat process loaded');
 		console.info(`Assistant Ready | ${this.currentSkills.size} Skills Loaded`);
+	}
+
+	makeWakeWordIntents(intents: IIntent[]) {
+		const wakeWordIntentPositive: IIntent = {
+			tag: 'respond',
+			description: 'The assistant should respond to this phrase',
+			entities: [],
+			examples: [Assistant.WAKE_WORD],
+		};
+
+		const wakeWordIntentNegative: IIntent = {
+			tag: 'ignore',
+			description: 'the assistant should ignore this phrase',
+			entities: [],
+			examples: [],
+		};
+
+		intents.forEach((i) => {
+			wakeWordIntentPositive.examples.push(
+				...i.examples.map(
+					(a) =>
+						`[${Assistant.WAKE_WORD[0].toUpperCase()}|${Assistant.WAKE_WORD[0].toLowerCase()}]${Assistant.WAKE_WORD.slice(
+							1
+						)} ${a}`
+				)
+			);
+			wakeWordIntentNegative.examples.push(...i.examples);
+		});
+
+		return [wakeWordIntentNegative, wakeWordIntentPositive];
 	}
 
 	getPlugin<T extends AssistantPlugin = AssistantPlugin>(plugin: string) {
@@ -254,6 +294,7 @@ export class Assistant extends Loadable {
 
 				this.currentSkills.get(intent.tag)?.push(skill);
 			});
+			this.emit('onSkillAdded', skill);
 			console.info(`Loaded skill ${skill.constructor.name}`);
 		} catch (error) {
 			console.info(`Failed to load skill ${skill.constructor.name}`);
@@ -280,16 +321,26 @@ export class Assistant extends Loadable {
 
 		const [plugin, callback] = toLoad;
 
-		await plugin.load();
-		const skills = await plugin.getSkills();
-		(await plugin.getIntents()).forEach((i) => {
-			this.addIntent(i);
-		});
-
-		await Promise.all(skills.map((skill) => this.useSkill(skill)));
-		this.plugins.set(plugin.id, plugin);
+		await this.loadPlugin(plugin);
 		callback(plugin);
-		this.emit('onPluginAdded', plugin.id);
+		this.emit('onPluginAdded', plugin);
+	}
+
+	async loadPlugin(plugin: AssistantPlugin) {
+		await plugin.load();
+
+		const skills = await plugin.getSkillPaths().then((skillPaths) =>
+			skillPaths.map((a) => {
+				const skill = new (require(a).default)() as AssistantSkill;
+				skill.plugin = plugin;
+				return skill;
+			})
+		);
+
+		if (skills.length)
+			await Promise.all(skills.map((skill) => this.useSkill(skill)));
+
+		this.plugins.set(plugin.id, plugin);
 	}
 
 	async analyzePrompt(
@@ -347,7 +398,6 @@ export class Assistant extends Loadable {
 		bIsVerifiedPrompt: boolean = false
 	) {
 		const promptAnalysis = await this.analyzePrompt(prompt, bIsVerifiedPrompt);
-
 		if (promptAnalysis.similarity < 0.8) {
 			return [];
 		}
@@ -365,7 +415,7 @@ export class Assistant extends Loadable {
 			return [];
 		}
 
-		const intentResult = await this.classifier.classify(
+		const intentResult = await this.skillClassifier.classify(
 			promptAnalysis.command,
 			Object.values(this.intents)
 		);
@@ -376,16 +426,16 @@ export class Assistant extends Loadable {
 
 		const { intent, entities } = intentResult;
 
-		const skills = this.currentSkills.get(intent);
+		const skills = this.currentSkills.get(intent) ?? [];
 
-		if (!skills) {
-			context.reply('I do not have any skills that can handle that right now.');
-			return [];
-		}
+		// if (!skills) {
+		// 	context.reply('I do not have any skills that can handle that right now.');
+		// 	return [];
+		// }
 
 		const activatedSkills: string[] = [];
 
-		skills.forEach((s) => {
+		skills.filter((s) => {
 			const skillInstance = new SkillInstance(
 				context,
 				promptAnalysis.command,
@@ -404,7 +454,22 @@ export class Assistant extends Loadable {
 		});
 
 		if (activatedSkills.length === 0) {
-			context.reply(`I dont have the brain cells to understand this`);
+			try {
+				console.log('Generating chat response for', promptAnalysis);
+				const response = await this.chat.getResponse(
+					context.sessionId,
+					promptAnalysis.command
+				);
+				if (response.length) {
+					context.reply(response);
+					return [];
+				}
+			} catch (error) {
+				console.error(error);
+			}
+			// 	context.reply('I do not have any skills that can handle that right now.');
+			// 	return [];
+			//context.reply(`I dont have the brain cells to understand this`);
 		}
 
 		// console.log(promptAnalysis);
@@ -522,6 +587,14 @@ export abstract class AssistantPlugin extends LoadableWithId {
 		return path.join(DATA_PATH, 'plugins', this.id);
 	}
 
+	get dirname(): string {
+		throw new Error('Plugin dir name not given ' + this.id);
+	}
+
+	get skillsDir() {
+		return path.join(this.dirname, 'skills');
+	}
+
 	override async load(): Promise<void> {
 		if (!fsSync.existsSync(this.dataPath)) {
 			await fs.mkdir(this.dataPath, {
@@ -530,11 +603,18 @@ export abstract class AssistantPlugin extends LoadableWithId {
 		}
 		return await super.load();
 	}
-	async getIntents(): Promise<IIntent[]> {
-		return [];
-	}
 
-	async getSkills(): Promise<AssistantSkill[]> {
-		return [];
+	async getSkillPaths(): Promise<string[]> {
+		if (!fsSync.existsSync(path.join(this.dirname, 'skills'))) {
+			return [];
+		}
+
+		return await fs
+			.readdir(this.skillsDir)
+			.then((a) =>
+				a
+					.filter((b) => b.endsWith('.js'))
+					.map((b) => path.join(this.skillsDir, b))
+			);
 	}
 }

@@ -1,35 +1,36 @@
-from bridge import Bridge, debug_string
+from bridge import Bridge
 import time
-from os import getcwd, path
 import json
-from neural import IntentsEngine
+from neural import IntentsEngine, NEREngine
 from typing import Union
+import os
 
 mainProcess = Bridge()
-engine: Union[IntentsEngine, None] = None
+engine_intents: Union[IntentsEngine, None] = None
+engine_ner: Union[NEREngine, None] = None
 
 
 def on_packet(op, buffer: bytes):
-    global engine
+    global engine_intents
+    global engine_ner
     if op == 2:
-        json_data = json.loads(buffer.decode())
-        if engine is None:
-            engine = IntentsEngine(list(json_data[
-                'tags']).copy(), json_data['model'])
+        json_data = json.loads(buffer.decode("utf-8"))
+
+        if engine_intents is None:
+            engine_intents = IntentsEngine(
+                list(json_data["tags"]).copy(),
+                os.path.join(json_data["dir"], "intents.pt"),
+            )
+            engine_intents.ready()
         else:
-            engine.update_intents(
-                list(json_data['tags']).copy())
-        mainProcess.send('Done'.encode(), op)
-    elif op == 1 and engine is not None:
-        intent = engine.get_intent(buffer.decode())
-        mainProcess.send(json.dumps(intent).encode(), op)
+            engine_intents.update_intents(list(json_data["tags"]).copy())
+        mainProcess.send("Done".encode(), op)
+    elif op == 1 and engine_intents is not None:
+        intent = engine_intents.get_intent(buffer.decode("utf-8"))
+        mainProcess.send(json.dumps({"intents": intent, "entities": []}).encode(), op)
     else:
-        mainProcess.send(f'0|unk'.encode(), op)
+        mainProcess.send(f"0|unk".encode(), op)
 
 
 mainProcess.add_on_packet(on_packet)
 mainProcess.ready()
-
-
-while True:
-    time.sleep(10)

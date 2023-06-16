@@ -87,11 +87,11 @@ export abstract class Loadable extends AssistantObject {
 		)
 			return;
 
-		await this.onLoad();
+		await this.beginLoad();
 		this.state = ELoadableState.ACTIVE;
 	}
 
-	async onLoad() {}
+	async beginLoad() {}
 
 	async waitForState(state: ELoadableState) {
 		if (this.state === state) return;
@@ -114,12 +114,12 @@ export abstract class Loadable extends AssistantObject {
 		)
 			return;
 
-		await this.onDestroy();
+		await this.beginDestroy();
 
 		this.state = ELoadableState.INACTIVE;
 	}
 
-	async onDestroy() {}
+	async beginDestroy() {}
 }
 
 export abstract class LoadableWithId extends Loadable {
@@ -131,3 +131,9 @@ export abstract class LoadableWithId extends Loadable {
 }
 
 export class EntityExtractionError extends Error {}
+
+export class SkillExecutionError extends Error {
+	constructor(message: string) {
+		super(message);
+	}
+}

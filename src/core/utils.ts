@@ -1,6 +1,8 @@
+import { BrowserWindow } from 'electron';
 import path from 'path';
 import { createInterface } from 'readline';
 import { compareTwoStrings } from 'string-similarity';
+import { Awaitable } from './types';
 
 export function pad(number: number, ammount = 5) {
 	let start = `${number}`;
@@ -73,4 +75,13 @@ export function mostLikelyOption<T extends string>(
 		},
 		[options[0], 0]
 	)[0];
+}
+
+export async function executeInBrowserWindow<
+	T extends (...args: unknown[]) => unknown,
+	R extends T extends (...args: unknown[]) => infer I ? Awaited<I> : unknown
+>(func: T, target: BrowserWindow, ...args: Parameters<T>): Promise<R> {
+	return await target.webContents.executeJavaScript(
+		`(${func.toString()})(${args.join(',')})`
+	);
 }
