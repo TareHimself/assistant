@@ -72,9 +72,9 @@ MODEL_PATH = path.join(MODEL_PATH, "stt")
 def on_voice_chunk(d):
     if recognizer.AcceptWaveform(bytes(d)):
         result = json.loads(recognizer.Result())["text"] + ""
-        # print("STT RESULT", result, file=open("stt.txt", "w"))
+        print("STT RESULT", result, file=open("stt.txt", "w"))
         if len(result) > 0:
-            testSocket.send(result.encode("utf-8"), 0)
+            testSocket.send(result.encode("utf-8"))
 
 
 model = Model(model_path=MODEL_PATH)

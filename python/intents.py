@@ -1,5 +1,4 @@
 from bridge import Bridge
-import time
 import json
 from neural import IntentsEngine, NEREngine
 from typing import Union
@@ -7,12 +6,11 @@ import os
 
 mainProcess = Bridge()
 engine_intents: Union[IntentsEngine, None] = None
-engine_ner: Union[NEREngine, None] = None
 
 
 def on_packet(op, buffer: bytes):
     global engine_intents
-    global engine_ner
+
     if op == 2:
         json_data = json.loads(buffer.decode("utf-8"))
 
@@ -33,4 +31,5 @@ def on_packet(op, buffer: bytes):
 
 
 mainProcess.add_on_packet(on_packet)
+
 mainProcess.ready()

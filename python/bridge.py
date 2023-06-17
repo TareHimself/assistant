@@ -1,10 +1,11 @@
 import socket
 import sys
-import os
 from typing import Callable
 import json
 from queue import Queue
-from threading import Thread, get_ident
+from threading import Thread
+
+import requests
 
 NO_REQUIRED_PARAMS = 4
 SERVER_PORT, PACKET_HEADER_DELIM, PACKET_START_DELIM, PACKET_END_DELIM = sys.argv[
@@ -31,29 +32,25 @@ def debug_string(data: str):
     sys.stdout.flush()
 
 
-# def pad(num: int, length: int = 2):
-#     final = str(num)
-#     current_len = len(final)
-#     if current_len < length:
-#         final = ("0" * (length - current_len)) + final
+def download_url(
+    url: str, chunk_size=1024, progress_callback: Callable[[int, int], None] = None
+):
+    response = requests.get(url, stream=True)
+    total_size = int(response.headers.get("content-length", 0))
+    downloaded_size = 0
 
-#     return final
+    if progress_callback is not None:
+        progress_callback(0, total_size)
 
+    data = b""
+    for chunk in response.iter_content(chunk_size=chunk_size):
+        if chunk:
+            data += chunk
+            downloaded_size += len(chunk)
+            if progress_callback is not None:
+                progress_callback(downloaded_size, total_size)
 
-# def make_header(packet_id: str, index: int = 0, total: int = 0):
-#     index_s = str(index)
-#     total_s = str(total)
-#     index_s = ("0"*(HEADER_PAD_AMMOUNT - len(index_s))) + index_s
-#     total_s = ("0"*(HEADER_PAD_AMMOUNT - len(total_s))) + total_s
-
-#     return f"{packet_id}|{index_s}|{total_s}".encode('utf-8')
-
-
-# def decode_header(packet: bytes):
-#     packet_id, part, total = packet[0:HEADER_LENGTH].decode('utf-8').split("|")
-#     packet = packet[HEADER_LENGTH:len(packet)]
-
-#     return packet_id, int(part), int(total), packet
+    return data
 
 
 def get_end_index(data: bytes):
@@ -90,10 +87,6 @@ def process_packet(
 
 class Bridge:
     def __init__(self) -> None:
-        print(
-            get_ident(),
-            file=open("t0.txt", "w"),
-        )
         self.stop = False
         self.to_main_queue = Queue()
         self.callbacks = []

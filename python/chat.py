@@ -1,19 +1,13 @@
 from bridge import Bridge
-import time
-from random import choice
-import json
 from gpt4all import GPT4All
-from threading import get_ident
 
 model = GPT4All("ggml-wizard-13b-uncensored")
-
 
 process_bridge = Bridge()
 
 
 def on_packet(op: int, packet: bytes):
     global model
-    print(packet.decode(), file=open("latest_prompt.txt", "w"))
     response = model.model.prompt_model(
         "You are a virtual assistant named Alice. Generate one response for ASSISTANT\n"
         + packet.decode(),

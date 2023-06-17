@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "assistant"
+version = "0.1.0"
+description = ""
+authors = ["Tare Ebelo <75279482+TareHimself@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+transformers = "^4.30.2"
+gpt4all = "^0.3.4"
+accelerate = "^0.20.3"
+diffusers = {extras = ["torch"], version = "^0.17.1"}
+sounddevice = "^0.4.6"
+pyaudio = "^0.2.13"
+poethepoet = "^0.20.0"
+vosk = "^0.3.45"
+
+[tool.poe.tasks]
+torch-win = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117"
+torch-linux = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"
+torch-mac ="pip install torch torchvision torchaudio"
+node-install = "npm install"
+node-watch ="npm run watch"
+node-start ="npm run start"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

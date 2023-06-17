@@ -44,5 +44,6 @@ keys.json
 logs
 out/
 data/
+*.lock
 xformers-0.0.20+a74599b.d20230515-cp39-cp39-win_amd64.whl
 package-lock.json

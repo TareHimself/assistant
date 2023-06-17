@@ -27,14 +27,6 @@ class ActiveChat {
 	}
 
 	encode() {
-		console.log(
-			Math.max(0, this.history.length - 3),
-			this.history.length - 1,
-			this.history.slice(
-				Math.max(0, this.history.length - 3),
-				this.history.length
-			)
-		);
 		return (
 			this.history
 				.slice(Math.max(0, this.history.length - 2), this.history.length)
@@ -73,7 +65,6 @@ export class ChatProcess extends Loadable {
 		);
 
 		const response = packet.toString().trim();
-		console.info(response);
 
 		chat.add('ASSISTANT', response);
 

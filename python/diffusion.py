@@ -7,8 +7,6 @@ from diffusers import (
 import random
 import torch
 import io
-from sys import argv
-import time
 import torch
 import sounddevice as sd
 import os

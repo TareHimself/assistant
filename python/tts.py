@@ -1,5 +1,3 @@
-from threading import Thread
-import time
 import torch
 import sounddevice as sd
 from os import path
