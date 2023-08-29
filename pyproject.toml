@@ -8,14 +8,14 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.9"
 transformers = "^4.30.2"
-gpt4all = "^0.3.4"
+gpt4all = "^1.0.8"
 accelerate = "^0.20.3"
 diffusers = {extras = ["torch"], version = "^0.17.1"}
 sounddevice = "^0.4.6"
 pyaudio = "^0.2.13"
 poethepoet = "^0.20.0"
 vosk = "^0.3.45"
-
+faster-whisper="^0.6.0"
 [tool.poe.tasks]
 torch-win = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117"
 torch-linux = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118"

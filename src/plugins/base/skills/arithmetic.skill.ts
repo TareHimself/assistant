@@ -2,7 +2,7 @@ import { AssistantSkill, SkillInstance } from '@core/assistant';
 import { EntityExtractionError } from '@core/base';
 import { wordsToDigits } from '@core/conversion';
 import { IIntent } from '@core/types';
-import math from 'mathjs';
+import { evaluate as evalMath } from 'mathjs';
 
 export default class ArithmeticSkill extends AssistantSkill {
 	static OPERATORS: Record<string, string> = {
@@ -70,12 +70,16 @@ export default class ArithmeticSkill extends AssistantSkill {
 	}
 
 	override async execute(instance: SkillInstance): Promise<void> {
+		const toEval = instance.entities.find((a) => a.entity === 'expr')?.data || ''
+		console.info("Evaling ",toEval)
+		const result = evalMath(
+			toEval
+		)
+		console.info("Result",result)
 		instance.context.reply(
 			ArithmeticSkill.POSSIBLE_RESPONSES.random().replace(
 				'@ans',
-				`${math.evaluate(
-					instance.entities.find((a) => a.entity === 'expr')?.data || ''
-				)}`
+				`${result}`
 			)
 		);
 	}

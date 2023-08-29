@@ -356,7 +356,10 @@ export class Assistant extends Loadable {
 			return {
 				similarity: 1,
 				fullPrompt: prompt,
-				command: prompt,
+				command: (prompt.toLowerCase().trim().startsWith(Assistant.WAKE_WORD)
+					? prompt.trim().slice(Assistant.WAKE_WORD.length)
+					: prompt
+				).trim(),
 			};
 		}
 
@@ -541,7 +544,7 @@ export abstract class AssistantPlugin extends LoadableWithId {
 			.readdir(this.skillsDir)
 			.then((a) =>
 				a
-					.filter((b) => b.endsWith('.js'))
+					.filter((b) => b.endsWith('.skill.js'))
 					.map((b) => path.join(this.skillsDir, b))
 			);
 	}

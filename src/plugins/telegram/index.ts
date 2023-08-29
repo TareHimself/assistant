@@ -41,6 +41,10 @@ class TelegramContext extends AssistantContext {
 		return 'telegram-io';
 	}
 
+	override get sessionId() {
+		return this.id + `-${this.data.chat.id}${this.data.userId}`;
+	}
+
 	override getInput(prompt: string, timeout?: number): Promise<string> {
 		return new Promise<string>((res) => {
 			const onMessageRecieved = (payload: ITelegramContextPayload) => {

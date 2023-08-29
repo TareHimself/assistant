@@ -149,21 +149,21 @@ export class SubProcess extends Loadable {
 			this.addBoundEvent(this.process, 'exit', onExitCallback);
 			console.info(`Started process ${this.filePath}`);
 
-			this.on('onProcessError', (b) => {
-				let debug = b.toString();
-				while (debug.startsWith('\r')) {
-					debug = debug.slice(1);
-				}
-				console.info(debug);
-			});
+			// this.on('onProcessError', (b) => {
+			// 	let debug = b.toString();
+			// 	while (debug.startsWith('\r')) {
+			// 		debug = debug.slice(1);
+			// 	}
+			// 	console.info(debug);
+			// });
 
-			this.on('onProcessStdout', (b) => {
-				let debug = b.toString();
-				while (debug.startsWith('\r')) {
-					debug = debug.slice(1);
-				}
-				console.info(debug);
-			});
+			// this.on('onProcessStdout', (b) => {
+			// 	let debug = b.toString();
+			// 	while (debug.startsWith('\r')) {
+			// 		debug = debug.slice(1);
+			// 	}
+			// 	console.info(debug);
+			// });j
 		});
 
 		this.on('onPacket', (op) => {

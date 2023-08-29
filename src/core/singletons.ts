@@ -22,7 +22,7 @@ export class CgasApi extends AssistantObject {
 
 	async upload(
 		filename: string,
-		file: Buffer
+		file: Buffer | ReadableStream
 	): Promise<ICgasApiResponse | null> {
 		try {
 			const form = new FormData();

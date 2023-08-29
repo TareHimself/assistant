@@ -27,12 +27,13 @@ model = torch.package.PackageImporter(MODEL_PATH).load_pickle("tts_models", "mod
 
 model.to(device)
 
-testSocket = Bridge()
+sock = Bridge()
 
 
 def on_packet(op, packet: bytes):
     global OUTPUT_DEVICE
     to_say = packet.decode() + "."
+
     audio = model.apply_tts(
         text=to_say,
         speaker=TTS_SPEAKER,
@@ -41,9 +42,9 @@ def on_packet(op, packet: bytes):
 
     sd.play(audio, SAMPLE_RATE, blocking=True, device=OUTPUT_DEVICE)
 
-    testSocket.send("done".encode(), op)
+    sock.send("done".encode(), op)
 
 
-testSocket.add_on_packet(on_packet)
+sock.add_on_packet(on_packet)
 
-testSocket.ready()
+sock.ready()

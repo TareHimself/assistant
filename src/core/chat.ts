@@ -10,7 +10,7 @@ class ActiveChat {
 	history: ChatEntry[] = [];
 	maxHistory: number;
 
-	constructor(maxHistory = 6) {
+	constructor(maxHistory = 4) {
 		this.maxHistory = maxHistory;
 	}
 
@@ -28,11 +28,12 @@ class ActiveChat {
 
 	encode() {
 		return (
-			this.history
-				.slice(Math.max(0, this.history.length - 2), this.history.length)
-				.reduce((total, cur) => {
-					return total + `${cur.role}: ${cur.content}\n`;
-				}, '') + `ASSISTANT: `
+			// 'Instruction: You are a virtual assistant named Alice. Generate one response for ASSISTANT. You must respond in a reasonable manner\n' +
+
+			"A chat between a user and an Ai Assistant\n" + this.history.reduce((total, cur) => {
+				return total + `${cur.role}: ${cur.content}\n`;
+			}, '') +
+			`ASSISTANT: `
 		);
 	}
 }
@@ -58,7 +59,7 @@ export class ChatProcess extends Loadable {
 		const chat = this.getActiveChat(id);
 
 		chat.add('USER', phrase);
-
+		// console.log(id, phrase, this.chats);
 		const [_, packet] = await this.process.sendAndWait(
 			Buffer.from(chat.encode()),
 			0
