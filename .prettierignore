@@ -1,6 +1,7 @@
 # Ignore artifacts:
 build
 coverage
-dist
-puppeter
-Old
+node_modules
+.webpack
+.old_github
+out

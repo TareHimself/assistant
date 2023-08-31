@@ -94,7 +94,7 @@ export default class TelegramPlugin extends AssistantPlugin {
 	pendingUserInputs: {
 		[key: string]: (message: ITelegramContextPayload) => void;
 	} = {};
-	override async beginLoad(): Promise<void> {
+	override async onLoad(): Promise<void> {
 		this.proxy.post('/telegram/webhook', (req) => {
 			req.sendStatus(200);
 

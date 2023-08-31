@@ -1,12 +1,35 @@
-import { AssistantContext, AssistantPlugin } from '@core/assistant';
+import {
+	AssistantContext,
+	AssistantPlugin,
+	AssistantSkill,
+	SkillInstance,
+} from '@core/assistant';
 import { ELoadableState } from '@core/base';
 import { PythonProcess } from '@core/subprocess';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import * as fs from 'fs';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, app } from 'electron';
 import { digitsToWords } from '@core/conversion';
 import { CgasApi } from '@core/singletons';
+import { withChildProcess } from '@core/thread';
+
+class BackgroundDesktopSkill extends AssistantSkill {
+	override shouldExecute(instance: SkillInstance): boolean {
+		return true;
+	}
+
+	override async execute(instance: SkillInstance): Promise<void> {
+		await new Promise<void>((res) => {
+			console.log("This will run forever")
+
+			app.on('will-quit',()=>{
+				console.log("That thins has finally stopped running")
+				res()
+			})
+		})
+	}
+}
 
 export class DesktopContext extends AssistantContext {
 	plugin: DesktopPlugin;
@@ -24,7 +47,7 @@ export class DesktopContext extends AssistantContext {
 		return this.id + '-user';
 	}
 
-	override async beginLoad() {}
+	override async onLoad() {}
 
 	override async reply(data: string): Promise<boolean> {
 		let final = data + (data.endsWith('.') ? '' : '.');
@@ -60,7 +83,10 @@ export class DesktopContext extends AssistantContext {
 		if (typeof data === 'string') {
 			uri = data;
 		} else {
-			const uploadInfo = await CgasApi.get().upload(uuidv4() + '.png', data);
+			const uploadInfo = await CgasApi.get().upload(
+				uuidv4() + '.png',
+				data
+			);
 			if (!uploadInfo) return false;
 			uri = uploadInfo.url;
 		}
@@ -95,7 +121,7 @@ export default class DesktopPlugin extends AssistantPlugin {
 		return 'desktop';
 	}
 
-	override async beginLoad(): Promise<void> {
+	override async onLoad(): Promise<void> {
 		await this.stt.waitForState(ELoadableState.ACTIVE);
 		await this.tts.waitForState(ELoadableState.ACTIVE);
 
@@ -108,8 +134,16 @@ export default class DesktopPlugin extends AssistantPlugin {
 				return;
 			}
 
-			this.assistant.tryStartSkill(pack.toString(), new DesktopContext(this));
+			this.assistant.tryStartSkill(
+				pack.toString(),
+				new DesktopContext(this)
+			);
 		});
+
+		this.assistant.startSkill(
+			new DesktopContext(this),
+			new BackgroundDesktopSkill()
+		);
 	}
 
 	override get dirname() {

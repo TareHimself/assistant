@@ -27,7 +27,7 @@ class SpotifyApi extends Loadable {
 		this.plugin = plugin;
 	}
 
-	override async beginLoad(): Promise<void> {
+	override async onLoad(): Promise<void> {
 		this.authPath = path.join(this.plugin.dataPath, 'auth.json');
 		if (fs.existsSync(this.authPath)) {
 			const auth = JSON.parse(
@@ -217,7 +217,7 @@ export default class SpotifyPlugin extends AssistantPlugin {
 		this.spotify = new SpotifyApi(this);
 	}
 
-	override async beginLoad(): Promise<void> {
+	override async onLoad(): Promise<void> {
 		await this.spotify.load();
 	}
 

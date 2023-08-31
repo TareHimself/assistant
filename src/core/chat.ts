@@ -41,7 +41,7 @@ export class ChatProcess extends Loadable {
 	process = new PythonProcess('chat.py');
 	chats: Map<string, ActiveChat> = new Map();
 
-	override async beginLoad(): Promise<void> {
+	override async onLoad(): Promise<void> {
 		await this.process.waitForState(ELoadableState.ACTIVE);
 	}
 

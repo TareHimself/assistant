@@ -32,7 +32,7 @@ export class SimpleIntentClassifier extends IntentClassifier {
 		this.minConfidence = confidenceThreshold;
 	}
 
-	override async beginLoad(): Promise<void> {
+	override async onLoad(): Promise<void> {
 		await this.classifierProcess.waitForState(ELoadableState.ACTIVE);
 	}
 
@@ -57,7 +57,9 @@ export class SimpleIntentClassifier extends IntentClassifier {
 		);
 
 		this.intentsStringified = intents.toString();
+		
 		this.intentsIndex = {};
+
 		intents.forEach((a) => {
 			this.intentsIndex[a.tag] = a;
 		});

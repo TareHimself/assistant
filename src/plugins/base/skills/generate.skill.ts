@@ -56,7 +56,7 @@ export default class GenerateImageSkill extends AssistantSkill {
 		poster: 'HeWhoRemixes/primemix_v21',
 	};
 
-	override async beginLoad(): Promise<void> {
+	override async onLoad(): Promise<void> {
 		// this.generator.on('onProcessStdout', (b) => console.info(b.toString()));
 		// this.generator.on('onProcessError', (b) => console.info(b.toString()));
 		await this.generator.waitForState(ELoadableState.ACTIVE);

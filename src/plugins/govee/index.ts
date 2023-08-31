@@ -15,7 +15,7 @@ export default class GoveePlugin extends AssistantPlugin {
 		return 'govee-plugin';
 	}
 
-	override async beginLoad(): Promise<void> {
+	override async onLoad(): Promise<void> {
 		const allDevicesResponse = await this.rest
 			.get<GooveApiResponse<{ devices: IGooveDeviceRaw[] }>>('devices')
 			.catch(console.error);

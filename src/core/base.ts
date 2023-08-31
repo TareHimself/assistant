@@ -87,11 +87,11 @@ export abstract class Loadable extends AssistantObject {
 		)
 			return;
 
-		await this.beginLoad();
+		await this.onLoad();
 		this.state = ELoadableState.ACTIVE;
 	}
 
-	async beginLoad() {}
+	async onLoad() {}
 
 	async waitForState(state: ELoadableState) {
 		if (this.state === state) return;

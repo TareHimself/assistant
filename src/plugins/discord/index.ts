@@ -15,6 +15,7 @@ export interface IDiscordMessageInfo {
 class DiscordContext extends AssistantContext {
 	plugin: DiscordPlugin;
 	data: IDiscordMessageInfo;
+
 	constructor(plugin: DiscordPlugin, data: IDiscordMessageInfo) {
 		super();
 		this.plugin = plugin;
@@ -82,7 +83,21 @@ export default class DiscordPlugin extends AssistantPlugin {
 
 	async tryClassify(prompt: string) {}
 
-	override async beginLoad(): Promise<void> {
+	login(): Promise<void> {
+		return new Promise<void>((res, rej) => {
+			this.client.once('ready', (c) => {
+				res();
+			});
+
+			try {
+				this.client.login(process.env.DISCORD_BOT_TOKEN).catch(rej);
+			} catch (error) {
+				rej(error);
+			}
+		});
+	}
+
+	override async onLoad(): Promise<void> {
 		// const { DiscordStreamClient } = await eval(
 		// 	`import('discord-stream-client')`
 		// );
@@ -93,8 +108,12 @@ export default class DiscordPlugin extends AssistantPlugin {
 			}
 
 			if (this.pendingUserInputs[message.channelId + message.author.id]) {
-				this.pendingUserInputs[message.channelId + message.author.id](message);
-				delete this.pendingUserInputs[message.channelId + message.author.id];
+				this.pendingUserInputs[message.channelId + message.author.id](
+					message
+				);
+				delete this.pendingUserInputs[
+					message.channelId + message.author.id
+				];
 				return;
 			}
 
@@ -136,29 +155,20 @@ export default class DiscordPlugin extends AssistantPlugin {
 			const isVerified =
 				message.guildId === null ||
 				(message.reference !== null
-					? (await message.fetchReference()).author.id === this.client.user?.id
+					? (await message.fetchReference()).author.id ===
+					  this.client.user?.id
 					: false);
 
-			this.assistant.tryStartSkill(
-				message.content,
-				new DiscordContext(this, {
-					message: message,
-				}),
-				isVerified
-			);
-		});
-
-		await new Promise<void>((res, rej) => {
-			this.client.once('ready', (c) => {
-				res();
+			const ctx = new DiscordContext(this, {
+				message: message,
 			});
 
-			try {
-				this.client.login(process.env.DISCORD_BOT_TOKEN).catch(rej);
-			} catch (error) {
-				rej(error);
-			}
+			message.channel.sendTyping();
+
+			this.assistant.tryStartSkill(message.content, ctx, isVerified);
 		});
+
+		await this.login();
 	}
 
 	override get id(): string {

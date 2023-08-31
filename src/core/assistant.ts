@@ -181,7 +181,7 @@ export class Assistant extends Loadable {
 			.then(() => this.emit('onReady', this));
 	}
 
-	override async beginLoad() {
+	override async onLoad() {
 		if (!fsSync.existsSync(this.dataPath)) {
 			await fs.mkdir(this.dataPath, {
 				recursive: true,
@@ -234,7 +234,9 @@ export class Assistant extends Loadable {
 		console.info('Loading chat process');
 		await this.chat.load();
 		console.info('Chat process loaded');
-		console.info(`Assistant Ready | ${this.currentSkills.size} Skills Loaded`);
+		console.info(
+			`Assistant Ready | ${this.currentSkills.size} Skills Loaded`
+		);
 	}
 
 	makeWakeWordIntents(intents: IIntent[]) {
@@ -356,7 +358,10 @@ export class Assistant extends Loadable {
 			return {
 				similarity: 1,
 				fullPrompt: prompt,
-				command: (prompt.toLowerCase().trim().startsWith(Assistant.WAKE_WORD)
+				command: (prompt
+					.toLowerCase()
+					.trim()
+					.startsWith(Assistant.WAKE_WORD)
 					? prompt.trim().slice(Assistant.WAKE_WORD.length)
 					: prompt
 				).trim(),
@@ -398,63 +403,83 @@ export class Assistant extends Loadable {
 		this.emit('onExpectingCommandStart');
 	}
 
+	startSkill(
+		context: AssistantContext,
+		skill: AssistantSkill<AssistantPlugin>,
+		command: string = '',
+		intent: string = '',
+		entities: IParsedEntity[] = []
+	): string | undefined {
+		const skillInstance = new SkillInstance(
+			context,
+			command,
+			intent,
+			entities,
+			skill
+		);
+
+		if (!skill.shouldExecute(skillInstance)) {
+			return undefined;
+		}
+
+		skillInstance.run();
+
+		return skillInstance.id;
+	}
+
 	async tryStartSkill(
 		prompt: string,
 		context: AssistantContext,
 		bIsVerifiedPrompt: boolean = false
 	) {
-		const promptAnalysis = await this.analyzePrompt(prompt, bIsVerifiedPrompt);
-		if (promptAnalysis.similarity > 0.8) {
-			this.stopExpecting();
-
-			if (promptAnalysis.command === '') {
-				this.startExpecting();
-				context.reply('Yes.');
-				return [];
-			}
-
-			if (this.state !== ELoadableState.ACTIVE) {
-				await context.reply('I cannot respond to requests yet');
-				return [];
-			}
-
-			const intentResult = await this.skillClassifier.classify(
-				promptAnalysis.command,
-				Object.values(this.intents)
+		try {
+			const promptAnalysis = await this.analyzePrompt(
+				prompt,
+				bIsVerifiedPrompt
 			);
 
-			if (!intentResult) {
-				return;
-			}
+			if (promptAnalysis.similarity > 0.8) {
+				this.stopExpecting();
 
-			const { intent, entities } = intentResult;
+				if (promptAnalysis.command === '') {
+					this.startExpecting();
+					context.reply('Yes.');
+					return [];
+				}
 
-			const skills = this.currentSkills.get(intent) ?? [];
+				if (this.state !== ELoadableState.ACTIVE) {
+					await context.reply('I cannot respond to requests yet');
+					return [];
+				}
 
-			const activatedSkills: string[] = [];
-
-			skills.filter((s) => {
-				const skillInstance = new SkillInstance(
-					context,
+				const intentResult = await this.skillClassifier.classify(
 					promptAnalysis.command,
-					intent,
-					entities,
-					s
+					Object.values(this.intents)
 				);
 
-				if (!s.shouldExecute(skillInstance)) {
+				if (!intentResult) {
 					return;
 				}
 
-				skillInstance.run();
+				const { intent, entities } = intentResult;
 
-				activatedSkills.push(skillInstance.id);
-			});
+				const skills = this.currentSkills.get(intent) ?? [];
 
-			if (activatedSkills.length > 0) {
-				return activatedSkills;
-			} else {
-				try {
+				const activatedSkills = skills
+					.map((s) =>
+						this.startSkill(
+							context,
+							s,
+							promptAnalysis.command,
+							intent,
+							entities
+						)
+					)
+					.filter((a) => a !== undefined) as string[];
+
+				if (activatedSkills.length > 0) {
+					return activatedSkills;
+				} else {
 					console.log('Generating chat response for', promptAnalysis);
 
 					const response = await this.chat.getResponse(
@@ -463,16 +488,16 @@ export class Assistant extends Loadable {
 					);
 
 					if (response.length) {
-						context.reply(response);
+						await context.reply(response);
 						return [];
 					}
-				} catch (error) {
-					console.error(error);
-					// 	context.reply('I do not have any skills that can handle that right now.');
-					// 	return [];
-					//context.reply(`I dont have the brain cells to understand this`);
 				}
 			}
+		} catch (error) {
+			console.error(error);
+			// 	context.reply('I do not have any skills that can handle that right now.');
+			// 	return [];
+			//context.reply(`I dont have the brain cells to understand this`);
 		}
 
 		return [];
